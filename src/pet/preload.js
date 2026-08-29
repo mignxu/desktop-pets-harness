@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("petAPI", {
   dragEnd: () => ipcRenderer.send("pet:drag-end"),
   poke: () => ipcRenderer.send("pet:poke"),
   bubbleOpen: (threadId) => ipcRenderer.send("bubble:open", threadId),
+  setZoom: (zoom) => ipcRenderer.send("pet:set-zoom", zoom),
   // 主 → 渲染
   onConfig: (cb) => ipcRenderer.once("pet:config", (_e, cfg) => cb(cfg)),
   onState: (cb) => ipcRenderer.on("pet:state", (_e, payload) => cb(payload)),

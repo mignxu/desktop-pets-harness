@@ -14,6 +14,15 @@ const APP_ROOT = path.join(__dirname, "..", "..");
 const PACK_DIR = process.env.PET_PACK ? path.resolve(process.env.PET_PACK) : path.join(APP_ROOT, "小呆");
 const NEST_DIR = path.join(APP_ROOT, "nest");
 const MODEL = process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || undefined;
+const SETTINGS_FILE = path.join(APP_ROOT, "pet-settings.json");
+
+function loadSettings() {
+  try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")); } catch { return {}; }
+}
+function saveSettings(patch) {
+  const settings = { ...loadSettings(), ...patch };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
 
 let petWin = null;
 let panelWin = null;
@@ -25,6 +34,10 @@ const smokeEvents = [];
 function frameNum(f) {
   const m = f.match(/_(\d+)\.png$/);
   return m ? parseInt(m[1], 10) : 0;
+}
+
+function clamp(v, lo, hi) {
+  return Math.min(hi, Math.max(lo, v));
 }
 
 function loadPack(dir) {
@@ -104,7 +117,23 @@ function createPetWindow(pack) {
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "..", "pet", "preload.js") },
   });
   petWin.loadFile(path.join(__dirname, "..", "pet", "index.html"));
-  petWin.webContents.on("did-finish-load", () => petWin.webContents.send("pet:config", pack));
+  petWin.webContents.on("did-finish-load", () =>
+    petWin.webContents.send("pet:config", { ...pack, zoom: loadSettings().zoom ?? 1 }));
+
+  // 滚轮缩放:窗口随有效倍率自适应,底边与水平中心保持不动,设置持久化
+  ipcMain.on("pet:set-zoom", (_e, zoom) => {
+    saveSettings({ zoom });
+    const dw = pack.display.width * pack.display.scale * zoom;
+    const dh = pack.display.height * pack.display.scale * zoom;
+    const width = Math.max(300, Math.ceil(dw) + 24);
+    const height = Math.ceil(dh) + 130; // 顶部气泡区 + 底部余量
+    const [wx, wy] = petWin.getPosition();
+    const [ww, wh] = petWin.getSize();
+    const area = screen.getPrimaryDisplay().workArea;
+    const x = clamp(Math.round(wx + (ww - width) / 2), area.x, area.x + area.width - width);
+    const y = clamp(Math.round(wy + wh - height), area.y, area.y + area.height - height);
+    petWin.setBounds({ x, y, width, height });
+  });
 
   let dragging = false;
   let grab = { dx: 0, dy: 0 };

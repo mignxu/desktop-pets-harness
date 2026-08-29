@@ -1,3 +1,6 @@
 node_modules/
 dist/
 spike-results.json
+v1-smoke.json
+pet-settings.json
+nest/

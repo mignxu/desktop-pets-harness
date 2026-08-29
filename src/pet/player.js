@@ -7,6 +7,7 @@
 const sprite = document.getElementById("sprite");
 const bubbleLayer = document.getElementById("bubbles");
 const statusDot = document.getElementById("status-dot");
+const groundShadow = document.getElementById("ground-shadow");
 const stage = document.getElementById("stage");
 
 const STATE_COLORS = {
@@ -21,8 +22,9 @@ const imgCache = new Map(); // actName -> Image[]
 let runToken = 0;
 let currentState = "idle";
 let stateBeforeDrag = null;
-let baseX = 0, baseY = 0; // 精灵默认落位(窗口内)
-let moveX = 0;            // need_move 行走位移累积
+let baseX = 0, baseY = 0;   // 精灵默认落位(窗口内)
+let moveX = 0;              // need_move 行走位移累积
+let zoom = 1;               // 用户缩放(滚轮调节,主进程持久化)
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function ready(img) {
@@ -30,6 +32,7 @@ async function ready(img) {
   await new Promise((r) => { img.onload = r; img.onerror = r; });
 }
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const effScale = () => config.display.scale * zoom;
 
 function ensureImages(actName) {
   if (imgCache.has(actName)) return imgCache.get(actName);
@@ -43,15 +46,34 @@ function ensureImages(actName) {
 }
 
 function layout() {
-  const dw = config.display.width * config.display.scale;
-  const dh = config.display.height * config.display.scale;
+  const dw = config.display.width * effScale();
+  const dh = config.display.height * effScale();
+  // 缩小倍率用平滑插值(避免锯齿线条感),放大像素画才用 pixelated
+  sprite.style.imageRendering = effScale() >= 1 ? "pixelated" : "auto";
   sprite.style.width = `${dw}px`;
   sprite.style.height = `${dh}px`;
-  sprite.style.top = "0";
   baseX = (window.innerWidth - dw) / 2;
   baseY = window.innerHeight - dh - 8; // 地面贴底
-  sprite.style.left = `${baseX}px`;
+  sprite.style.left = `${baseX + moveX}px`;
+  sprite.style.top = `${baseY}px`;
+  // 地面光晕:把宠物"钉"在地上,给比例一个参考物(对齐浏览器 demo 的观感)
+  const sw = Math.max(60, dw * 0.42);
+  const sh = Math.max(10, dh * 0.05);
+  groundShadow.style.width = `${sw}px`;
+  groundShadow.style.height = `${sh}px`;
+  groundShadow.style.left = `${window.innerWidth / 2 - sw / 2}px`;
+  groundShadow.style.top = `${baseY + dh - sh / 2}px`;
 }
+
+// ---- 滚轮缩放(0.4x ~ 2.5x,主进程持久化并随缩放调整窗口)----
+window.addEventListener("wheel", (e) => {
+  if (!config) return;
+  const next = clamp(Math.round((zoom + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10, 0.4, 2.5);
+  if (next === zoom) return;
+  zoom = next;
+  layout();
+  window.petAPI.setZoom(zoom);
+}, { passive: true });
 
 // ---- 帧步进 ----
 async function playAct(actName, token, { loopUntilTokenChanges = false } = {}) {
@@ -68,8 +90,8 @@ async function playAct(actName, token, { loopUntilTokenChanges = false } = {}) {
       sprite.src = imgs[i].src;
       if (act.needMove) moveX += (act.direction === "left" ? -1 : 1) * act.frameMove;
       moveX = clamp(moveX, -46, 46);
-      const x = baseX + act.anchor[0] * config.display.scale + moveX;
-      const y = baseY + act.anchor[1] * config.display.scale;
+      const x = baseX + act.anchor[0] * effScale() + moveX;
+      const y = baseY + act.anchor[1] * effScale();
       sprite.style.left = `${x}px`;
       sprite.style.top = `${y}px`;
       await wait(act.frameRefresh);
@@ -190,6 +212,7 @@ window.addEventListener("mousemove", (e) => {
 // ---- 主进程事件 ----
 window.petAPI.onConfig((cfg) => {
   config = cfg;
+  zoom = clamp(cfg.zoom ?? 1, 0.4, 2.5);
   layout();
   setState("idle", true);
 });

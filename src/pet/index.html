@@ -14,8 +14,15 @@
     #sprite {
       position: absolute;
       pointer-events: auto;
-      image-rendering: pixelated;
+      /* image-rendering 由 player.js 按有效倍率动态设置:
+         放大像素画用 pixelated,缩小(如小呆 0.8x)用平滑,避免锯齿线条感 */
       cursor: grab;
+    }
+    #ground-shadow {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(0, 0, 0, 0.30), transparent 68%);
+      pointer-events: none;
     }
     #sprite:active { cursor: grabbing; }
     #status-dot {
@@ -57,6 +64,7 @@
 </head>
 <body>
   <div id="stage">
+    <div id="ground-shadow"></div>
     <img id="sprite" draggable="false" alt="" />
     <div id="bubbles"></div>
     <div id="status-dot"></div>
