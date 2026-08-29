@@ -3,60 +3,211 @@
 <head>
   <meta charset="utf-8" />
   <style>
+    /* 实底控制台,视觉模仿 Codex Desktop(笔记 7.7 修订):中性深色、圆角卡、细边框、无模糊 */
+    :root {
+      --bg: #171a21;          /* 窗口底 */
+      --surface: #1e222b;     /* 侧栏/标题栏 */
+      --card: #232936;        /* 消息/工具卡 */
+      --card-hi: #2a3140;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e6eaf2;
+      --dim: #8a94a6;
+      --accent: #4da3ff;
+      --ok: #3fbf7f;
+      --warn: #e8b64c;
+      --err: #e06c60;
+      --mono: Consolas, "Cascadia Mono", monospace;
+    }
+    * { box-sizing: border-box; }
     html, body {
       margin: 0; height: 100%;
-      background: transparent;      /* 面板外圈透明:验证透明窗本身 */
-      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: var(--bg); color: var(--text);
+      font: 13px/1.55 "Segoe UI", "Microsoft YaHei", sans-serif;
       overflow: hidden;
     }
-    .wrap { height: 100%; display: flex; align-items: center; justify-content: center; }
-    .card {
-      width: 560px; border-radius: 14px;
-      background: rgba(15, 18, 26, 0.87);  /* 内容区近实底:可读性优先 */
-      border: 1px solid rgba(159, 232, 255, 0.28);
-      box-shadow: 0 8px 40px rgba(0,0,0,.45), 0 0 24px rgba(80,180,255,.12) inset;
-      color: #e8ecf4; padding: 20px 24px;
+    #app { display: flex; flex-direction: column; height: 100vh; }
+
+    /* 标题栏 */
+    #titlebar {
+      display: flex; align-items: center; gap: 10px;
+      height: 40px; padding: 0 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      -webkit-app-region: drag; user-select: none;
     }
-    h1 { font-size: 15px; margin: 0 0 4px; color: #9fe8ff; letter-spacing: .5px; }
-    .sub { font-size: 11px; color: #7d8aa0; margin-bottom: 14px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    td { padding: 5px 4px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: top; }
-    td.k { color: #7d8aa0; width: 150px; }
-    td.v { font-family: Consolas, monospace; word-break: break-all; }
-    .verdict { margin-top: 12px; font-size: 12px; padding: 10px 12px; border-radius: 8px;
-      background: rgba(159,232,255,.08); border: 1px solid rgba(159,232,255,.2); }
-    .glow { color: #9fe8ff; }
+    #titlebar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px currentColor; }
+    #titlebar .name { font-weight: 600; }
+    #titlebar .path { color: var(--dim); font-size: 12px; font-family: var(--mono); }
+    #titlebar .spacer { flex: 1; }
+    #titlebar button {
+      -webkit-app-region: no-drag;
+      width: 30px; height: 26px; border: 0; border-radius: 6px;
+      background: transparent; color: var(--dim); cursor: pointer; font-size: 13px;
+    }
+    #titlebar button:hover { background: var(--card-hi); color: var(--text); }
+
+    /* 三栏 */
+    #body { flex: 1; display: grid; grid-template-columns: 220px 1fr 230px; min-height: 0; }
+    #sidebar, #rail { background: var(--surface); overflow-y: auto; }
+    #sidebar { border-right: 1px solid var(--border); padding: 10px 8px; }
+    #rail { border-left: 1px solid var(--border); padding: 12px; }
+
+    .thread {
+      padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .thread:hover { background: var(--card); }
+    .thread.active { background: var(--card-hi); }
+    .thread .t-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .thread .t-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .thread .t-badge {
+      font-size: 10px; background: var(--warn); color: #171a21; border-radius: 8px;
+      padding: 0 6px; font-weight: 700;
+    }
+    .harness-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--dim);
+      border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px;
+    }
+    #new-thread {
+      width: 100%; margin-top: 8px; padding: 7px 0;
+      border: 1px dashed var(--border); border-radius: 8px;
+      background: transparent; color: var(--dim); cursor: pointer; font-size: 12px;
+    }
+    #new-thread:hover { color: var(--text); border-color: var(--dim); }
+
+    /* transcript */
+    #center { display: flex; flex-direction: column; min-width: 0; }
+    #transcript { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .msg { margin-bottom: 12px; max-width: 92%; }
+    .msg.user { margin-left: auto; }
+    .msg .bubble {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 9px 13px; white-space: pre-wrap; word-break: break-word;
+    }
+    .msg.user .bubble { background: var(--card-hi); border-color: rgba(77, 163, 255, 0.35); }
+    .msg .role { font-size: 11px; color: var(--dim); margin-bottom: 3px; }
+    .item { margin-bottom: 10px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 9px 12px;
+    }
+    .card .head { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .card .head .st { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex: none; }
+    .card .head .st.inProgress { background: var(--accent); animation: pulse 1.2s infinite; }
+    .card .head .st.succeeded { background: var(--ok); }
+    .card .head .st.failed { background: var(--err); }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .card .mono { font-family: var(--mono); font-size: 12px; color: #cdd6e4; word-break: break-all; }
+    .card details { margin-top: 6px; }
+    .card summary { cursor: pointer; color: var(--dim); font-size: 11px; user-select: none; }
+    .card pre {
+      margin: 6px 0 0; padding: 8px; background: #14171e; border-radius: 8px;
+      font: 11px/1.5 var(--mono); color: #a8b3c4; white-space: pre-wrap; word-break: break-word;
+      max-height: 220px; overflow-y: auto;
+    }
+    details.reasoning pre { color: #7d8aa0; }
+    .approval { border-color: rgba(232, 182, 76, 0.55); }
+    .approval.flash { animation: flash 1s ease 3; }
+    @keyframes flash { 30% { box-shadow: 0 0 0 3px rgba(232, 182, 76, .35); } }
+    .approval .btns { display: flex; gap: 8px; margin-top: 9px; }
+    .approval button {
+      border: 1px solid var(--border); background: var(--card-hi); color: var(--text);
+      border-radius: 7px; padding: 5px 14px; cursor: pointer; font-size: 12px;
+    }
+    .approval button.allow { background: var(--ok); border-color: var(--ok); color: #10231a; font-weight: 600; }
+    .approval button.deny:hover { border-color: var(--err); color: var(--err); }
+    .approval button:disabled { opacity: .45; cursor: default; }
+    .approval .resolved { font-size: 12px; color: var(--dim); }
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--dim); font-size: 11px; margin: 14px 0 10px;
+    }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+    .divider .err { color: var(--err); }
+    .divider .ok { color: var(--ok); }
+
+    /* 右栏 */
+    #rail h3 { font-size: 11px; color: var(--dim); margin: 0 0 6px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    #rail .kv { margin-bottom: 14px; }
+    #rail .row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+    #rail .row .k { color: var(--dim); }
+    #rail .row .v { font-family: var(--mono); }
+    #rail hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
+    .bar { height: 6px; border-radius: 3px; background: var(--card-hi); overflow: hidden; margin: 4px 0 10px; }
+    .bar > div { height: 100%; background: var(--accent); border-radius: 3px; }
+
+    /* Composer */
+    #composer { border-top: 1px solid var(--border); background: var(--surface); padding: 10px 14px; }
+    #composer .row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    #input {
+      width: 100%; resize: none; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--card); color: var(--text);
+      font: 13px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif;
+      padding: 9px 12px; min-height: 40px; max-height: 140px; outline: none;
+    }
+    #input:focus { border-color: rgba(77, 163, 255, 0.5); }
+    #composer .row2 { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    #send, #stop {
+      margin-left: auto; border: 0; border-radius: 8px; padding: 6px 18px;
+      cursor: pointer; font-size: 12px; font-weight: 600;
+    }
+    #send { background: var(--accent); color: #0d1622; }
+    #send:disabled { opacity: .4; cursor: default; }
+    #stop { background: var(--card-hi); color: var(--err); display: none; }
+    .chip-locked { cursor: not-allowed; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>桌面宠物壳 · v0 Spike 面板</h1>
-      <div class="sub">Spike A:毛玻璃材质解析与降级链 · 本卡内容区为近实底(可读性优先)</div>
-      <table id="info"></table>
-      <div class="verdict" id="verdict"></div>
+  <div id="app">
+    <div id="titlebar">
+      <div class="dot" id="agg-dot"></div>
+      <span class="name">🐾 窝 · 全局工作区</span>
+      <span class="path" id="title-path"></span>
+      <div class="spacer"></div>
+      <button id="btn-min" title="最小化">—</button>
+      <button id="btn-close" title="收回宠物">✕</button>
+    </div>
+    <div id="body">
+      <div id="sidebar">
+        <div class="harness-chip" id="side-harness">🐾 Claude Code</div>
+        <div id="thread-list"></div>
+        <button id="new-thread">＋ 新对话(选品种)</button>
+      </div>
+      <div id="center">
+        <div id="transcript"></div>
+        <div id="composer">
+          <textarea id="input" rows="1" placeholder="给宠物派个活…(Enter 发送,Shift+Enter 换行)"></textarea>
+          <div class="row2">
+            <span class="harness-chip chip-locked" id="composer-harness" title="对话绑定 harness,不可中途切换(铁律)">🐾 Claude Code · 已锁定</span>
+            <span class="harness-chip" id="composer-model">model: -</span>
+            <button id="stop">⏹ 停止</button>
+            <button id="send">发送</button>
+          </div>
+        </div>
+      </div>
+      <div id="rail">
+        <div class="kv">
+          <h3>会话</h3>
+          <div class="row"><span class="k">模型</span><span class="v" id="rail-model">-</span></div>
+          <div class="row"><span class="k">工作目录</span><span class="v" id="rail-cwd">-</span></div>
+          <div class="row"><span class="k">待审批</span><span class="v" id="rail-pending">0</span></div>
+        </div>
+        <hr />
+        <div class="kv">
+          <h3>最近一轮 Usage</h3>
+          <div class="row"><span class="k">输入 tokens</span><span class="v" id="rail-in">-</span></div>
+          <div class="row"><span class="k">输出 tokens</span><span class="v" id="rail-out">-</span></div>
+          <div class="row"><span class="k">费用</span><span class="v" id="rail-cost">-</span></div>
+        </div>
+        <hr />
+        <div class="kv">
+          <h3>上下文占用(估)</h3>
+          <div class="bar"><div id="ctx-bar" style="width: 0%"></div></div>
+          <div class="row"><span class="k">≈输入 tokens</span><span class="v" id="rail-ctx">-</span></div>
+        </div>
+      </div>
     </div>
   </div>
-  <script>
-    const q = new URLSearchParams(location.search);
-    const rows = [
-      ["选择材质", q.get("material")],
-      ["实现策略", q.get("strategy")],
-      ["判定原因", q.get("reason")],
-      ["Electron", q.get("electron")],
-      ["Node(main)", q.get("node")],
-      ["GPU 状态", (() => { try { return JSON.stringify(JSON.parse(q.get("gpu"))); } catch { return q.get("gpu"); } })()],
-    ];
-    document.getElementById("info").innerHTML = rows
-      .map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${String(v ?? "").replace(/</g, "&lt;")}</td></tr>`)
-      .join("");
-    const material = q.get("material");
-    const strategy = q.get("strategy");
-    document.getElementById("verdict").innerHTML = material !== "none"
-      ? `✅ 系统毛玻璃可用:<span class="glow">${material}</span>(窗口外圈应透出桌面且带模糊)`
-      : `⚠️ 系统毛玻璃不可用 → 降级为 <span class="glow">${strategy}</span>:` +
-        `<br>卡片外的区域应为<b>完全透明</b>(能直接看到桌面/其他窗口),卡片本体保持高不透明度保证可读。` +
-        `<br>这正是笔记 7.7 的降级链:acrylic(Win11) → 透明+近实底内容卡(Win10/关特效) → 全实色。`;
-  </script>
+  <script src="panel.js"></script>
 </body>
 </html>

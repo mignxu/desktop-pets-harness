@@ -7,7 +7,8 @@
   "scripts": {
     "gen:frames": "node tools/gen-frames.mjs",
     "start": "electron .",
-    "spikes": "electron . --self-test"
+    "spikes": "electron . --self-test",
+    "smoke": "electron . --smoke"
   },
   "devDependencies": {
     "electron": "^44.0.0"

@@ -48,10 +48,8 @@ class ThreadManager {
       });
     }
     thread.session.start(text).catch(() => {}); // consume 内部已 fail()
-    if (!thread.log.some((e) => e.__user)) {
-      // 用户输入进日志,面板才有所显
-      thread.log.push({ __user: true, text });
-    }
+    thread.log.push({ __user: true, threadId, text });
+    this.publish({ __user: true, threadId, text });
   }
 
   respond(threadId, interactionId, behavior) {

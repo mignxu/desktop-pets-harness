@@ -15,21 +15,23 @@
    - 第 7 节:本产品全部已定决策(信息架构 / 审批闭环 / 视觉 / 技术栈)
    - 第 8 节:最终形态愿景、不变式与演进路线
 2. **不要重新讨论已锁定的决策**(速查见下);对已锁定项有异议,先读笔记里的论证再提
-3. 当前阶段:**v0 技术 spike 已全部通过**(Electron 44,四项结果见笔记 7.10);`demo/` 下另有 DyberPet act_conf 播放器网页 demo(双击 `demo/xiaodai.html` 即跑);下一步 v1 垂直切片
+3. 当前阶段:**v1 垂直切片已实现并通过冒烟**(宠物窗 act_conf Player + Claude Code adapter + 实底控制台面板,结构与结果见笔记 7.13);本机中转网关凭据 403,待换凭据跑真 pong
 
-## 构建与运行(v0)
+## 构建与运行
 
 ```bash
 npm install          # electron 二进制若从 GitHub 下载卡死,用:
                      # ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node node_modules/electron/install.js
-npm run gen:frames   # 生成 24 帧测试素材(src/pet/frames)
-npm start            # 手动模式:宠物窗(右下角)+ 面板窗,肉眼检查
-npm run spikes       # 自测模式:跑四个 spike,写 spike-results.json 后自动退出
+npm start            # 产品入口:宠物窗(小呆,右下角)+ 实底控制台面板
+npm run smoke        # 冒烟:自动发一轮 turn,写 v1-smoke.json(面板隐藏)
+npm run spikes       # v0 四项技术验证(写 spike-results.json)
+npm run gen:frames   # 生成 spike 用的 24 帧测试素材
 ```
 
-- Spike C(Claude SDK)只在 `npm run spikes` 或 `SPIKE_RUN_SDK=1 npm start` 时运行
-- 本机为 Win10(19045):毛玻璃走降级链是**预期行为**;acrylic 需 Win11 验证
-- 目录:`src/main`(Electron 主进程+spike 装配)、`src/pet`(宠物窗:帧动画/点击穿透)、`src/panel`(玻璃面板)、`tools/gen-frames.mjs`(素材生成)、`demo/`(效果预览 scratch,**不进主线**)、`pets/`、`小呆/`、`像素猫meme/`(素材包,仅参考)
+- 模型走 Claude Agent SDK:`CLAUDE_MODEL`/`ANTHROPIC_MODEL` 可覆盖;本机经中转网关,凭据问题会以 403 形式浮出到面板(这是设计行为)
+- 宠物包:`PET_PACK=<目录>` 指定其他 DyberPet 格式包,默认 `小呆/`;工作目录为 `nest/`(窝)
+- 本机为 Win10(19045):面板是实底(主形态);acrylic 仅 Win11 可选增强
+- 目录:`src/main`(入口分发:v1-main 产品 / spike-main 验证)、`src/shared`(契约)、`src/adapter`(harness 适配)、`src/host`(线程管理与聚合)、`src/pet`(宠物窗 Player)、`src/panel`(控制台面板)、`src/spike`(v0 遗迹)、`tools/`(素材脚本)、`demo/`(预览 scratch,不进主线)、`小呆/`(宠物素材包)
 
 ## 已锁定决策速查(论证详见笔记第 7-8 节)
 

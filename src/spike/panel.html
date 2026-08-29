@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body {
+      margin: 0; height: 100%;
+      background: transparent;      /* 面板外圈透明:验证透明窗本身 */
+      font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+    .wrap { height: 100%; display: flex; align-items: center; justify-content: center; }
+    .card {
+      width: 560px; border-radius: 14px;
+      background: rgba(15, 18, 26, 0.87);  /* 内容区近实底:可读性优先 */
+      border: 1px solid rgba(159, 232, 255, 0.28);
+      box-shadow: 0 8px 40px rgba(0,0,0,.45), 0 0 24px rgba(80,180,255,.12) inset;
+      color: #e8ecf4; padding: 20px 24px;
+    }
+    h1 { font-size: 15px; margin: 0 0 4px; color: #9fe8ff; letter-spacing: .5px; }
+    .sub { font-size: 11px; color: #7d8aa0; margin-bottom: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    td { padding: 5px 4px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: top; }
+    td.k { color: #7d8aa0; width: 150px; }
+    td.v { font-family: Consolas, monospace; word-break: break-all; }
+    .verdict { margin-top: 12px; font-size: 12px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(159,232,255,.08); border: 1px solid rgba(159,232,255,.2); }
+    .glow { color: #9fe8ff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>桌面宠物壳 · v0 Spike 面板</h1>
+      <div class="sub">Spike A:毛玻璃材质解析与降级链 · 本卡内容区为近实底(可读性优先)</div>
+      <table id="info"></table>
+      <div class="verdict" id="verdict"></div>
+    </div>
+  </div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const rows = [
+      ["选择材质", q.get("material")],
+      ["实现策略", q.get("strategy")],
+      ["判定原因", q.get("reason")],
+      ["Electron", q.get("electron")],
+      ["Node(main)", q.get("node")],
+      ["GPU 状态", (() => { try { return JSON.stringify(JSON.parse(q.get("gpu"))); } catch { return q.get("gpu"); } })()],
+    ];
+    document.getElementById("info").innerHTML = rows
+      .map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${String(v ?? "").replace(/</g, "&lt;")}</td></tr>`)
+      .join("");
+    const material = q.get("material");
+    const strategy = q.get("strategy");
+    document.getElementById("verdict").innerHTML = material !== "none"
+      ? `✅ 系统毛玻璃可用:<span class="glow">${material}</span>(窗口外圈应透出桌面且带模糊)`
+      : `⚠️ 系统毛玻璃不可用 → 降级为 <span class="glow">${strategy}</span>:` +
+        `<br>卡片外的区域应为<b>完全透明</b>(能直接看到桌面/其他窗口),卡片本体保持高不透明度保证可读。`;
+  </script>
+</body>
+</html>

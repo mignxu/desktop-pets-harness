@@ -187,6 +187,7 @@ class ClaudeCodeSession {
       }
 
       case "result": {
+        this.sawResult = true;
         this.emit({
           type: "turn.completed",
           threadId: this.threadId,
@@ -253,6 +254,7 @@ class ClaudeCodeSession {
   }
 
   fail(error) {
+    if (this.sawResult) return; // result 已发,is_error 的失败已随 turn.completed 上报,SDK 事后抛错不重复计
     this.emit({
       type: "turn.failed",
       threadId: this.threadId,

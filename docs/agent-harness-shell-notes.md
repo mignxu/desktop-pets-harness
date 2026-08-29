@@ -324,12 +324,30 @@ Renderer-面板窗(玻璃): 三栏 UI + transcript + 审批卡
 
 ### 7.12 待定问题
 
-- [ ] Win11 真机补验 acrylic;spike C 换可用凭据(或直连 API)复测拿到 pong
-- [ ] 第一批 harness(倾向 Claude Code 起步)+ 接入路线(ACP vs 原生 Agent SDK)
-- [ ] 宠物动作资产:首发角色的 8 个基础动作清单(7.11 的 DyberPet 格式已核实,可从"小呆包"动作映射起步)
-- [ ] MVP 垂直切片范围
-- [x] ~~demo/ 合流~~(用户明确:demo 仅为效果预览 scratch,不进主线;act_conf Player 按主线自研,格式兼容即可)
-- [ ] v1 垂直切片:宠物窗(act_conf 兼容 Player,自研)+ Claude Code adapter + 实底控制台面板 + 审批闭环
+- [ ] Win11 真机补验 acrylic;换可用凭据(或直连 API)复测拿到 pong
+- [ ] 第一批 harness 之外的第二家(ACP 通用兜底 vs 原生)——Claude Code 已是第一批
+- [ ] 面板/审批闭环的肉眼验证(冒烟只验证了事件链,交互手感要人测)
+- [ ] MVP 收尾范围:多对话、会话持久化、Usage-饥饿联动等按需排期
+
+### 7.13 v1 垂直切片实现(2026-08-29,冒烟通过 ✅)
+
+```
+src/shared/contracts.js    契约词汇 + 状态聚合(审批>出错>干活>空闲)
+src/adapter/claude-code.js SDK→契约:文本流式(stream_event textDelta)、
+                           工具按 assistant/user 完整消息、canUseTool→审批交互
+src/host/thread-manager.js 事件事实源:日志落账、状态推导、宠物聚合、双总线广播
+src/pet/player.js          act_conf 兼容 Player(吃 小呆/ 等 DyberPet 包):
+                           idle=加权随机动作组 / working=focus / waiting=disturbed /
+                           error=onfloor;patpat、拖拽(主进程随光标移窗)、审批气泡
+src/panel/*                实底控制台三栏(事件流重放渲染):审批卡内嵌消息流、
+                           Composer(harness 锁定)、Usage/上下文右栏
+src/main/v1-main.js        装配:窝目录(nest/)、PET_PACK/CLAUDE_MODEL 环境变量、
+                           --smoke 冒烟模式(自动发一轮 turn,写 v1-smoke.json)
+```
+
+- **冒烟结果**:事件链全通 `user → turn.started → thread.meta → item.started → item.updated(textDelta 流式!) → item.completed → turn.completed`;宠物包 23 动作加载成功
+- 本机中转网关 403("无权访问 国产模型 分组",会话被解析到 DeepSeek-V4-Flash)是**凭据/网关配置问题**,不影响架构;换凭据即可看到真 pong
+- v0 spike UI 迁至 `src/spike/`(保留可运行),v1 入口为默认;入口分发在 `src/main/main.js`
 
 ---
 
