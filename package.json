@@ -1,0 +1,18 @@
+{
+  "name": "desktop-pets-harness",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Desktop-pet shell for multiple agent harnesses - v0 technical spikes",
+  "main": "src/main/main.js",
+  "scripts": {
+    "gen:frames": "node tools/gen-frames.mjs",
+    "start": "electron .",
+    "spikes": "electron . --self-test"
+  },
+  "devDependencies": {
+    "electron": "^44.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.251"
+  }
+}
