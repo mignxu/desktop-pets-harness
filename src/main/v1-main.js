@@ -28,8 +28,55 @@ if (!app.requestSingleInstanceLock()) {
 const APP_ROOT = path.join(__dirname, "..", "..");
 const PACK_DIR = process.env.PET_PACK ? path.resolve(process.env.PET_PACK) : path.join(APP_ROOT, "小呆");
 const NEST_DIR = path.join(APP_ROOT, "nest");
-const MODEL = process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || undefined;
 const SETTINGS_FILE = path.join(APP_ROOT, "pet-settings.json");
+const STORE_DIR = path.join(APP_ROOT, "store");
+const CONV_FILE = path.join(STORE_DIR, "conversations.json");
+const API_CONFIG_FILE = path.join(STORE_DIR, "api-config.json");
+
+// API 接入配置(store/api-config.json:{ baseUrl, apiKey, model })。
+// 注入 Claude Agent SDK 的 CLI 所认的环境变量(继承进子进程),进程环境变量优先于文件。
+// 必须在计算 MODEL 之前执行。
+(function applyApiConfig() {
+  try {
+    if (fs.existsSync(API_CONFIG_FILE)) {
+      const cfg = JSON.parse(fs.readFileSync(API_CONFIG_FILE, "utf8"));
+      if (cfg.baseUrl) process.env.ANTHROPIC_BASE_URL = cfg.baseUrl;
+      if (cfg.apiKey) process.env.ANTHROPIC_AUTH_TOKEN = cfg.apiKey;
+      if (cfg.model) process.env.ANTHROPIC_MODEL = cfg.model;
+      console.log("[v1] API 配置已加载:", cfg.baseUrl, "| 模型:", cfg.model ?? "(未指定)");
+    }
+  } catch (error) {
+    console.error("[v1] API 配置读取失败:", error.message);
+  }
+})();
+const MODEL = process.env.CLAUDE_MODEL || process.env.ANTHROPIC_MODEL || undefined;
+
+// 会话持久化:事件日志全量落盘,重启恢复(防抖写,退出兜底)
+function saveConversations() {
+  if (!manager) return;
+  try {
+    fs.mkdirSync(STORE_DIR, { recursive: true });
+    fs.writeFileSync(CONV_FILE, JSON.stringify(manager.serialize(), null, 2));
+  } catch (error) {
+    console.error("[store] 保存失败:", error.message);
+  }
+}
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveConversations, 600);
+}
+function restoreConversations() {
+  try {
+    if (!fs.existsSync(CONV_FILE)) return 0;
+    const count = manager.loadThreads(JSON.parse(fs.readFileSync(CONV_FILE, "utf8")));
+    if (count) console.log("[v1] 已恢复", count, "个会话");
+    return count;
+  } catch (error) {
+    console.error("[store] 恢复失败:", error.message);
+    return 0;
+  }
+}
 
 function loadSettings() {
   try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")); } catch { return {}; }
@@ -269,13 +316,8 @@ function createPanelWindow() {
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "..", "panel", "preload.js") },
   });
   panelWin.loadFile(path.join(__dirname, "..", "panel", "index.html"));
-  console.log("[trace] panel created, visible =", panelWin.isVisible());
-  panelWin.on("show", () => console.log("[trace] panel show"));
-  panelWin.on("close", () => console.log("[trace] panel close"));
-  panelWin.on("minimize", () => console.log("[trace] panel minimize"));
   if (!SMOKE) {
     panelWin.once("ready-to-show", () => {
-      console.log("[trace] ready-to-show, minimized =", panelWin.isMinimized());
       if (panelWin.isMinimized()) panelWin.restore();
       panelWin.show();
       panelWin.focus();
@@ -352,6 +394,7 @@ app.whenReady().then(async () => {
     for (const win of [panelWin, petWin]) {
       if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
     }
+    if (channel === "contract:event") scheduleSave();
   };
 
   manager = new ThreadManager({ broadcast: (ch, payload) => broadcast(ch, payload) });
@@ -366,7 +409,11 @@ app.whenReady().then(async () => {
       manager.startTurn(thread.threadId, "请只回复两个字母:pong");
     }, 1000);
   } else {
-    manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "新对话" });
+    if (restoreConversations() === 0) {
+      manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "新对话" });
+    } else {
+      manager.publish();
+    }
     console.log("[v1] 手动模式:右下角宠物 + 控制台面板已就绪。模型:", MODEL ?? "(SDK 默认)",
       MOCK ? "(演示模式:2 秒后自动开演一轮模拟 turn)" : "");
     if (MOCK) {
@@ -378,4 +425,5 @@ app.whenReady().then(async () => {
   }
 });
 
+app.on("before-quit", saveConversations);
 app.on("window-all-closed", () => app.quit());

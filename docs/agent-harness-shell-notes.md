@@ -363,7 +363,19 @@ src/main/v1-main.js        装配:窝目录(nest/)、PET_PACK/CLAUDE_MODEL 环�
 - **两个被演示模式揪出的老 bug**:
   1. **broadcast 空函数吞事件**:模块级 `broadcast` 默认 no-op,只有 smoke 分支重新赋值 → 手动模式下面板/宠物从未收到过任何事件(此前未被发现,因为验收截图全是空首页)。已修复:总线实现统一,smoke 只附加收集钩子
   2. MockSession 构造器漏初始化 `approvals` Map → 首个事件即崩、又被 `start().catch(()=>{})` 静默吞掉 → 面板空白且日志干净。教训:**适配器的会话状态字段必须在构造器初始化;start 的 catch 不要静默,至少 diagnose**
+- **真 turn 准备包(2026-08-30)**:① agent 回复走 **markdown 渲染**(marked,先转义 `< >` 防注入再 parse;流式 150ms 节流重渲染,completed 时 flush)② fileChange 卡支持 **unified diff +/- 着色视图**(契约词 `item.unifiedDiff`,mock 已带样例;真实 Edit 的 diff 形状待真 turn 检验后补提取)③ **会话持久化**:事件日志全量落盘 `store/conversations.json`(每事件防抖 600ms,退出兜底),启动恢复(`loadThreads`,运行中会话归位 idle,日志完整重放);smoke 模式不恢复
 - v0 spike UI 迁至 `src/spike/`(保留可运行),v1 入口为默认;入口分发在 `src/main/main.js`
+
+### 7.14 真 turn 接入战记(2026-08-30)
+
+- **API 配置机制**:`store/api-config.json`(`{baseUrl, apiKey, model}`,gitignore 内)→ 主进程启动注入 `ANTHROPIC_BASE_URL/AUTH_TOKEN/MODEL`;adapter 以**会话级 settings(flag settings 层,最高优先级)**传给 CLI,避免被用户全局 `~/.claude/settings.json` 的 env 覆盖(本机全局配着旧中转 new-api.abrdns.com + 旧 key + 强制 DeepSeek-V4-Flash)
+- **三个连环坑**:
+  1. 注入时序:adapter 顶层计算 settings 时 applyApiConfig 还没跑 → 拿到空环境。**需要进程状态的模块必须惰性求值**
+  2. 用户全局 settings.json 的 env 块优先级高于继承的进程环境 → 会话级 settings 是唯一干净的覆盖方式(不动用户全局配置)
+  3. 关闭扩展思考:`MAX_THINKING_TOKENS=0`(MiniMax 等国产模型只认 thinking type=开启/关闭/自动,CLI 默认思考配置会 400)
+- **最终卡点(站主侧)**:新中转(ai.xn--…icu)的 `/v1/messages` 为裸透传,不做 Claude 格式转换——`system` 字段原样转发被上游拒("未知请求字段:system"),**20 个模型全部同样报错**;CLI 必发 system,故该站当前无法承载 CLI。curl 直连(不带 system)能正常拿到 completion,证明 key/模型/网络全通
+- 诊断方法沉淀:curl 直连打点二分(带/不带 system、换路径、列模型),把"壳问题 vs 站问题"干净分离
+- **真 turn 跑通(2026-08-30)**:站主关闭请求穿透后,`minimax-m2.5` 经壳完整跑通真 turn(流式正文、usage/cost 全真)。收尾适配:MiniMax 系把思考以 `<think>…</think>` 混在正文流——adapter 按标签拆分进 reasoning 条目;SDK `assistant` 完整消息与流式增量是同一份内容,**流式已输出的块在 assistant 阶段只做收尾,不重复追加**(否则双写)
 
 ---
 

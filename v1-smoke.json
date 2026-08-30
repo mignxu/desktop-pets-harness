@@ -3,55 +3,85 @@
   "events": [
     {
       "__user": true,
-      "threadId": "t_mtf6a3dp_zfgdu",
+      "threadId": "t_mtfhpa10_kz8m2",
       "text": "请只回复两个字母:pong"
     },
     {
       "type": "turn.started",
-      "threadId": "t_mtf6a3dp_zfgdu"
+      "threadId": "t_mtfhpa10_kz8m2"
     },
     {
       "type": "thread.meta",
-      "threadId": "t_mtf6a3dp_zfgdu",
+      "threadId": "t_mtfhpa10_kz8m2",
       "meta": {
-        "model": "DeepSeek-V4-Flash",
+        "model": "minimax-m2.5",
         "cwd": "D:\\selfProject\\Dev\\desktop-pets-harness\\nest"
       }
     },
     {
       "type": "item.started",
-      "threadId": "t_mtf6a3dp_zfgdu",
+      "threadId": "t_mtfhpa10_kz8m2",
       "item": {
-        "itemId": "6b879b92-0080-4456-8aa9-a730fb9af6e5",
+        "itemId": "749e4b11-93bc-4c56-9e82-4fa2b40e34b5",
         "type": "agentMessage",
         "text": ""
       }
     },
     {
+      "type": "item.started",
+      "threadId": "t_mtfhpa10_kz8m2",
+      "item": {
+        "itemId": "db4afaca-216d-42f0-94ee-78e16a525c85",
+        "type": "reasoning",
+        "text": ""
+      }
+    },
+    {
       "type": "item.updated",
-      "threadId": "t_mtf6a3dp_zfgdu",
-      "itemId": "6b879b92-0080-4456-8aa9-a730fb9af6e5",
+      "threadId": "t_mtfhpa10_kz8m2",
+      "itemId": "db4afaca-216d-42f0-94ee-78e16a525c85",
       "patch": {
-        "textDelta": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608300210448175878698268d9d6XCa4PZI6)"
+        "textDelta": "\nThe"
+      }
+    },
+    {
+      "type": "item.updated",
+      "threadId": "t_mtfhpa10_kz8m2",
+      "itemId": "db4afaca-216d-42f0-94ee-78e16a525c85",
+      "patch": {
+        "textDelta": " user is asking me to respond with just two letters: \"pong\". This is a simple request to test that I'm working and listening.\n"
       }
     },
     {
       "type": "item.completed",
-      "threadId": "t_mtf6a3dp_zfgdu",
-      "itemId": "6b879b92-0080-4456-8aa9-a730fb9af6e5",
+      "threadId": "t_mtfhpa10_kz8m2",
+      "itemId": "db4afaca-216d-42f0-94ee-78e16a525c85",
+      "status": "succeeded"
+    },
+    {
+      "type": "item.updated",
+      "threadId": "t_mtfhpa10_kz8m2",
+      "itemId": "749e4b11-93bc-4c56-9e82-4fa2b40e34b5",
+      "patch": {
+        "textDelta": "\n\npong"
+      }
+    },
+    {
+      "type": "item.completed",
+      "threadId": "t_mtfhpa10_kz8m2",
+      "itemId": "749e4b11-93bc-4c56-9e82-4fa2b40e34b5",
       "status": "succeeded"
     },
     {
       "type": "turn.completed",
-      "threadId": "t_mtf6a3dp_zfgdu",
+      "threadId": "t_mtfhpa10_kz8m2",
       "outcome": {
-        "status": "failed",
-        "result": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608300210448175878698268d9d6XCa4PZI6)",
+        "status": "succeeded",
+        "result": "<think>\nThe user is asking me to respond with just two letters: \"pong\". This is a simple request to test that I'm working and listening.\n</think>\n\npong",
         "usage": {
-          "inputTokens": 0,
-          "outputTokens": 0,
-          "costUsd": 0,
-          "error": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608300210448175878698268d9d6XCa4PZI6)"
+          "inputTokens": 22937,
+          "outputTokens": 33,
+          "costUsd": 0.135023
         }
       }
     }

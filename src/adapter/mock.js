@@ -44,12 +44,23 @@ class MockSession {
     }
     emit({ type: "item.completed", threadId: this.threadId, itemId: reasoning.itemId, status: "succeeded" });
 
-    // 2) 回复(逐字流式)
+    // 2) 回复(逐字流式,带 markdown:列表/粗体/代码块)
     const msg = this.item("agentMessage", { text: "" });
     emit({ type: "item.started", threadId: this.threadId, item: msg });
-    const lead = "好的,演示一轮完整流程:先查看窝目录,然后我会申请执行一条演示命令,届时需要你在面板里决定。";
+    const lead = [
+      "好的,演示一轮完整流程:",
+      "",
+      "1. 先查看**窝目录**",
+      "2. 申请执行一条 `演示命令`",
+      "",
+      "```bash",
+      "echo 模拟审批通过 > 演示.txt",
+      "```",
+      "",
+      "届时需要你在面板里决定,宠物也会来喊你。",
+    ].join("\n");
     for (const ch of lead) {
-      await wait(26);
+      await wait(18);
       if (this.cancelled) return this.finishCancelled();
       emit({ type: "item.updated", threadId: this.threadId, itemId: msg.itemId, patch: { textDelta: ch } });
     }
@@ -66,8 +77,20 @@ class MockSession {
     });
     emit({ type: "item.completed", threadId: this.threadId, itemId: cmd.itemId, status: "succeeded" });
 
-    // 4) 文件修改
-    const file = this.item("fileChange", { path: "nest/演示.md", toolName: "Write", status: "inProgress" });
+    // 4) 文件修改(带 unified diff,面板渲染 +/- 视图)
+    const file = this.item("fileChange", {
+      path: "nest/演示.md", toolName: "Write", status: "inProgress",
+      unifiedDiff: [
+        "diff --git a/nest/演示.md b/nest/演示.md",
+        "--- a/nest/演示.md",
+        "+++ b/nest/演示.md",
+        "@@ -1 +1,3 @@",
+        "-旧的演示内容",
+        "+新的演示内容",
+        "+由模拟 turn 生成",
+        "+用于验证 Diff 视图",
+      ].join("\n"),
+    });
     emit({ type: "item.started", threadId: this.threadId, item: file });
     await wait(700);
     if (this.cancelled) return this.finishCancelled();

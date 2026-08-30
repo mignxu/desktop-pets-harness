@@ -7,6 +7,31 @@ const { randomUUID } = require("node:crypto");
 const SHELL_TOOLS = new Set(["Bash"]);
 const FILE_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
+// 会话级 settings:把壳注入的 API 配置( store/api-config.json → 进程环境 )以最高优先级
+// (flag settings 层)传给 CLI,避免被用户全局 ~/.claude/settings.json 的 env 块覆盖。
+// 注意:必须惰性计算——本模块被 require 时 applyApiConfig() 还没跑,进程环境尚未注入。
+function relaySettings() {
+  if (!process.env.ANTHROPIC_BASE_URL) return undefined;
+  return {
+    env: {
+      ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL,
+      // 兼容国产模型中转:MiniMax 等只认 thinking type=开启/关闭/自动,
+      // CLI 默认的思考配置会 400,这里显式关闭扩展思考
+      MAX_THINKING_TOKENS: "0",
+      ...(process.env.ANTHROPIC_AUTH_TOKEN ? { ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN } : {}),
+      ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}),
+      ...(process.env.ANTHROPIC_MODEL
+        ? {
+            ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+            ANTHROPIC_DEFAULT_SONNET_MODEL: process.env.ANTHROPIC_MODEL,
+            ANTHROPIC_DEFAULT_OPUS_MODEL: process.env.ANTHROPIC_MODEL,
+            ANTHROPIC_DEFAULT_HAIKU_MODEL: process.env.ANTHROPIC_MODEL,
+          }
+        : {}),
+    },
+  };
+}
+
 function summarizeToolInput(toolName, input = {}) {
   if (toolName === "Bash") return `$ ${input.command ?? ""}`;
   if (FILE_TOOLS.has(toolName)) return `${toolName}: ${input.file_path ?? input.notebook_path ?? ""}`;
@@ -33,6 +58,7 @@ class ClaudeCodeSession {
     this.emit = emit; // (contractEvent) => void
     this.abort = null;
     this.running = false;
+    this.inThink = false;
     this.byToolUseId = new Map(); // SDK tool_use id -> itemId
     this.approvals = new Map();   // interactionId -> resolve({behavior})
   }
@@ -43,6 +69,7 @@ class ClaudeCodeSession {
     this.abort = new AbortController();
     const { query } = await import("@anthropic-ai/claude-agent-sdk");
     this.emit({ type: "turn.started", threadId: this.threadId });
+    const settings = relaySettings();
     const iterator = query({
       prompt: text,
       options: {
@@ -51,6 +78,7 @@ class ClaudeCodeSession {
         abortController: this.abort,
         permissionMode: "default",
         includePartialMessages: true,
+        ...(settings ? { settings } : {}),
         canUseTool: (toolName, input) => this.requestApproval(toolName, input),
       },
     });
@@ -145,7 +173,7 @@ class ClaudeCodeSession {
         }
         if (event.type === "content_block_delta") {
           if (event.delta?.type === "text_delta" && event.delta.text) {
-            this.appendAgentMessage(event.delta.text);
+            this.appendTextSplittingThink(event.delta.text);
           }
           if (event.delta?.type === "thinking_delta" && event.delta.thinking) {
             this.appendReasoning(event.delta.thinking);
@@ -158,11 +186,16 @@ class ClaudeCodeSession {
         const blocks = message.message?.content ?? [];
         for (const block of blocks) {
           if (block.type === "text") {
-            this.startAgentMessage();
-            this.appendAgentMessage(block.text);
-            this.completeItem(this.textItemId, "succeeded");
+            // 流式已增量输出的内容不重复追加(assistant 完整消息是同一份文本)
+            if (this.textItemId) {
+              this.completeItem(this.textItemId, "succeeded");
+            } else {
+              this.startAgentMessage();
+              this.appendTextSplittingThink(block.text);
+              this.completeItem(this.textItemId, "succeeded");
+            }
           } else if (block.type === "thinking") {
-            this.appendReasoning(block.thinking ?? "");
+            if (!this.reasoningItemId) this.appendReasoning(block.thinking ?? "");
             if (this.reasoningItemId) this.completeItem(this.reasoningItemId, "succeeded");
           } else if (block.type === "tool_use") {
             this.startToolItem(block.id, block.name, block.input ?? {});
@@ -207,6 +240,28 @@ class ClaudeCodeSession {
           },
         });
         return;
+      }
+    }
+  }
+
+  // MiniMax 等国产模型把思考以 <think>…</think> 混在正文流里:
+  // 拆开,思考进 reasoning 条目,正文保持干净(标签跨增量分片的场景按普通文本放行)
+  appendTextSplittingThink(delta) {
+    let rest = delta;
+    while (rest) {
+      if (!this.inThink) {
+        const open = rest.indexOf("<think>");
+        if (open === -1) { this.appendAgentMessage(rest); return; }
+        if (open > 0) this.appendAgentMessage(rest.slice(0, open));
+        this.inThink = true;
+        rest = rest.slice(open + 7);
+      } else {
+        const close = rest.indexOf("</think>");
+        if (close === -1) { this.appendReasoning(rest); return; }
+        if (close > 0) this.appendReasoning(rest.slice(0, close));
+        this.inThink = false;
+        this.completeItem(this.reasoningItemId, "succeeded");
+        rest = rest.slice(close + 8);
       }
     }
   }

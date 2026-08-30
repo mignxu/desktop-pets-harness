@@ -128,6 +128,36 @@ class ThreadManager {
     const log = Object.fromEntries([...this.threads.values()].map((t) => [t.threadId, t.log]));
     return { threads, log };
   }
+
+  // ---- 会话持久化:落盘 / 恢复(事件日志可完整重放,面板 renderAll 直接吃) ----
+  serialize() {
+    return {
+      savedAt: new Date().toISOString(),
+      threads: [...this.threads.values()].map((t) => ({
+        threadId: t.threadId,
+        title: t.title,
+        harnessId: t.harnessId,
+        cwd: t.cwd,
+        model: t.model,
+        usage: t.usage,
+        meta: t.meta,
+        // 运行中/等待中的会话在重启后无法续跑,统一归位 idle(日志保留可回看)
+        state: t.state === "working" || t.state === "waitingInteraction" ? "idle" : t.state,
+        log: t.log,
+      })),
+    };
+  }
+
+  loadThreads(data) {
+    if (!data || !Array.isArray(data.threads)) return 0;
+    let count = 0;
+    for (const t of data.threads) {
+      if (!t || typeof t.threadId !== "string" || !Array.isArray(t.log)) continue;
+      this.threads.set(t.threadId, { ...t, state: "idle", session: null });
+      count += 1;
+    }
+    return count;
+  }
 }
 
 function collectPendingInteractions(thread) {

@@ -167,12 +167,39 @@ function addDivider(html) {
   innerEl.appendChild(div);
 }
 
+// ---- Markdown(agent 回复):先转义 < > 防注入再 parse;流式时 150ms 节流重渲染 ----
+const mdState = new Map(); // itemId -> { raw, el, timer, dirty }
+function renderMd(raw) {
+  const escaped = raw.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  try {
+    return marked.parse(escaped, { breaks: true, gfm: true });
+  } catch {
+    return esc(raw);
+  }
+}
+function appendMd(itemId, el, delta) {
+  let st = mdState.get(itemId);
+  if (!st) { st = { raw: "", el: null, timer: null, dirty: false }; mdState.set(itemId, st); }
+  st.raw += delta;
+  st.el = el;
+  if (st.timer) { st.dirty = true; return; }
+  el.innerHTML = renderMd(st.raw);
+  st.timer = setTimeout(() => {
+    st.timer = null;
+    if (st.dirty && st.el) { st.dirty = false; st.el.innerHTML = renderMd(st.raw); }
+  }, 150);
+}
+function flushMd(itemId) {
+  const st = mdState.get(itemId);
+  if (st && st.el) { st.el.innerHTML = renderMd(st.raw); st.el = null; }
+}
+
 function renderItemStart(item) {
   const wrap = document.createElement("div");
   wrap.className = "item";
   if (item.type === "agentMessage") {
     wrap.className = "msg agent";
-    wrap.innerHTML = `<div class="text"></div>`;
+    wrap.innerHTML = `<div class="text md"></div>`;
     innerEl.appendChild(wrap);
     itemEls.set(item.itemId, wrap.querySelector(".text"));
     return;
@@ -190,6 +217,7 @@ function renderItemStart(item) {
     wrap.innerHTML = `
       <div class="card">
         <div class="head"><span class="st inProgress"></span><b>✎ 文件修改</b><span class="mono path"></span></div>
+        ${item.unifiedDiff ? `<pre class="diff">${renderDiff(item.unifiedDiff)}</pre>` : ""}
       </div>`;
   } else {
     wrap.innerHTML = `
@@ -212,8 +240,8 @@ function renderItemUpdate({ itemId, patch }) {
   const el = itemEls.get(itemId);
   if (!el) return;
   if (patch.textDelta) {
-    const target = el.tagName === "DIV" || el.tagName === "PRE" ? el : el.querySelector?.(".text");
-    if (target) target.textContent += patch.textDelta;
+    if (el.tagName === "PRE") el.textContent += patch.textDelta; // 思考过程:纯文本
+    else appendMd(itemId, el, patch.textDelta);                  // agent 回复:markdown
   }
   if (patch.output !== undefined) {
     const out = el.querySelector?.(".out");
@@ -225,7 +253,17 @@ function renderItemUpdate({ itemId, patch }) {
   }
 }
 
+function renderDiff(diffText) {
+  return diffText.split(/\r?\n/).map((line) => {
+    const cls = line.startsWith("+") && !line.startsWith("+++") ? "add"
+      : line.startsWith("-") && !line.startsWith("---") ? "del"
+      : line.startsWith("@@") ? "hunk" : "line";
+    return `<span class="line ${cls}">${esc(line) || " "}</span>`;
+  }).join("");
+}
+
 function renderItemCompleted({ itemId, status }) {
+  if (mdState.has(itemId)) flushMd(itemId);
   const el = itemEls.get(itemId);
   if (!el) return;
   const st = itemEls.get(itemId + ":st");
