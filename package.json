@@ -9,10 +9,17 @@
     "start": "electron .",
     "start:mock": "electron . --mock",
     "spikes": "electron . --self-test",
-    "smoke": "electron . --smoke"
+    "smoke": "electron . --smoke",
+    "panel:build": "vite build --config panel.vite.config.js",
+    "icon": "electron scripts/gen-icon.js",
+    "dist": "npm run panel:build && npm run icon && electron-builder --win",
+    "dist:dir": "npm run panel:build && npm run icon && electron-builder --win --dir"
   },
   "devDependencies": {
-    "electron": "^44.0.0"
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.2.2"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.251",
@@ -22,5 +29,6 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
-  }
+  },
+  "author": "desktop-pets-harness"
 }

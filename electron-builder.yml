@@ -1,0 +1,26 @@
+appId: com.selfproject.desktop-pets-harness
+productName: DesktopPetShell
+directories:
+  output: dist
+  buildResources: build
+files:
+  - package.json
+  - src/**/*
+  - build/panel/**/*
+extraResources:
+  - from: 小呆
+    to: 小呆
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: DesktopPetShell-Setup-${version}.exe
+portable:
+  artifactName: DesktopPetShell-Portable-${version}.exe

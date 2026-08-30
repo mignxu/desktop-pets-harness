@@ -26,10 +26,16 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 const APP_ROOT = path.join(__dirname, "..", "..");
-const PACK_DIR = process.env.PET_PACK ? path.resolve(process.env.PET_PACK) : path.join(APP_ROOT, "小呆");
-const NEST_DIR = path.join(APP_ROOT, "nest");
-const SETTINGS_FILE = path.join(APP_ROOT, "pet-settings.json");
-const STORE_DIR = path.join(APP_ROOT, "store");
+// 打包态:可写数据(存储/窝/设置)走 userData,只读宠物包走 extraResources
+const DATA_ROOT = app.isPackaged ? app.getPath("userData") : APP_ROOT;
+const PACK_DIR = process.env.PET_PACK
+  ? path.resolve(process.env.PET_PACK)
+  : app.isPackaged
+    ? path.join(process.resourcesPath, "小呆")
+    : path.join(APP_ROOT, "小呆");
+const NEST_DIR = path.join(DATA_ROOT, "nest");
+const SETTINGS_FILE = path.join(DATA_ROOT, "pet-settings.json");
+const STORE_DIR = path.join(DATA_ROOT, "store");
 const CONV_FILE = path.join(STORE_DIR, "conversations.json");
 const API_CONFIG_FILE = path.join(STORE_DIR, "api-config.json");
 
@@ -315,7 +321,7 @@ function createPanelWindow() {
     show: !SMOKE,
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "..", "panel", "preload.js") },
   });
-  panelWin.loadFile(path.join(__dirname, "..", "panel", "index.html"));
+  panelWin.loadFile(path.join(__dirname, "..", "..", "build", "panel", "index.html"));
   if (!SMOKE) {
     panelWin.once("ready-to-show", () => {
       if (panelWin.isMinimized()) panelWin.restore();
@@ -394,7 +400,7 @@ app.whenReady().then(async () => {
     for (const win of [panelWin, petWin]) {
       if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
     }
-    if (channel === "contract:event") scheduleSave();
+    if (channel === "contract:event" && !SMOKE) scheduleSave(); // smoke 不污染会话存储
   };
 
   manager = new ThreadManager({ broadcast: (ch, payload) => broadcast(ch, payload) });
