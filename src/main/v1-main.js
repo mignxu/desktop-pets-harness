@@ -2,6 +2,10 @@
 // 模式:npm start(手动)/ npm run smoke(--smoke,自动发一轮 turn,写 v1-smoke.json)。
 'use strict';
 
+// --mock:演示模式,必须在使用 thread-manager 前设置(其顶层按环境选择 adapter)
+const MOCK = process.argv.includes("--mock");
+if (MOCK) process.env.MOCK_TURN = "1";
+
 const { app, BrowserWindow, ipcMain, screen } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -10,6 +14,17 @@ const { pathToFileURL } = require("node:url");
 const { ThreadManager } = require("../host/thread-manager.js");
 
 const SMOKE = process.argv.includes("--smoke");
+// 单实例:重复启动时聚焦已有面板,避免双宠物/数据竞争
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (panelWin && !panelWin.isDestroyed()) {
+      panelWin.show();
+      panelWin.focus();
+    }
+  });
+}
 const APP_ROOT = path.join(__dirname, "..", "..");
 const PACK_DIR = process.env.PET_PACK ? path.resolve(process.env.PET_PACK) : path.join(APP_ROOT, "小呆");
 const NEST_DIR = path.join(APP_ROOT, "nest");
@@ -40,17 +55,57 @@ function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
 }
 
-function loadPack(dir) {
-  const petConf = JSON.parse(fs.readFileSync(path.join(dir, "pet_conf.json"), "utf8"));
-  const actConf = JSON.parse(fs.readFileSync(path.join(dir, "act_conf.json"), "utf8"));
-  const actionDir = path.join(dir, "action");
+// mod 解压常嵌套一层(如 像素猫meme/像素猫meme/pet_conf.json):自动下钻
+function resolvePackDir(dir) {
+  if (fs.existsSync(path.join(dir, "pet_conf.json"))) return dir;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && fs.existsSync(path.join(dir, entry.name, "pet_conf.json"))) {
+      return path.join(dir, entry.name);
+    }
+  }
+  return dir;
+}
+
+// 读 PNG IHDR 拿原生宽高(不用解码整图)
+function pngSize(file) {
+  const buf = Buffer.alloc(24);
+  const fd = fs.openSync(file, "r");
+  try {
+    fs.readSync(fd, buf, 0, 24, 0);
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+// 渲染模式:默认平滑(高清手绘);小帧放大判定为像素画 → pixelated;按包可在 pet-settings.json 覆盖
+function resolveImageRendering(packDir, petConf, settings, firstFrameFile) {
+  const override = settings.packs?.[path.basename(packDir)]?.imageRendering;
+  if (override) return override;
+  let frameWidth = 0;
+  try {
+    frameWidth = pngSize(firstFrameFile).width;
+  } catch {}
+  if (frameWidth > 0 && frameWidth <= 128 && (petConf.scale ?? 1) >= 1) return "pixelated";
+  return "auto";
+}
+
+function loadPack(dir, settings = {}) {
+  const packDir = resolvePackDir(dir);
+  const petConf = JSON.parse(fs.readFileSync(path.join(packDir, "pet_conf.json"), "utf8"));
+  const actConf = JSON.parse(fs.readFileSync(path.join(packDir, "act_conf.json"), "utf8"));
+  const actionDir = path.join(packDir, "action");
   const files = fs.readdirSync(actionDir).filter((f) => f.endsWith(".png"));
   const acts = {};
+  let firstFrameFile = null;
   for (const [name, def] of Object.entries(actConf)) {
     const frames = files
       .filter((f) => f.startsWith(`${def.images}_`))
       .sort((a, b) => frameNum(a) - frameNum(b))
-      .map((f) => pathToFileURL(path.join(actionDir, f)).href);
+      .map((f) => {
+        if (!firstFrameFile) firstFrameFile = path.join(actionDir, f);
+        return pathToFileURL(path.join(actionDir, f)).href;
+      });
     if (!frames.length) continue;
     acts[name] = {
       frames,
@@ -68,15 +123,22 @@ function loadPack(dir) {
     .filter((g) => (g.act_prob ?? 0) > 0)
     .map((g) => ({ act_list: (g.act_list ?? []).filter((a) => acts[a]), act_prob: g.act_prob }))
     .filter((g) => g.act_list.length);
+  // patpat 兼容:字符串(像素猫)或按饱食度分级的字典(小呆)
+  const patpatConf = petConf.patpat;
+  const patpat = typeof patpatConf === "string"
+    ? patpatConf
+    : (patpatConf && (patpatConf["3"] ?? patpatConf["2"])) || "patpat1";
   return {
     display: { width: petConf.width ?? 256, height: petConf.height ?? 256, scale: petConf.scale ?? 1 },
+    imageRendering: resolveImageRendering(packDir, petConf, settings, firstFrameFile ?? ""),
     acts,
     mapping: {
       idle: idle.length ? idle : [{ act_list: defAct, act_prob: 1 }],
       working: pick(petConf.focus ?? "focus"),
-      waiting: [...pick("disturbed"), ...defAct],                       // "被吵醒"= 有事找你
+      // 等待审批态:持续循环"被吵醒"动画,直到处理完(用户要求,笔记 7.5)
+    waiting: acts["disturbed"] ? ["disturbed"] : defAct,
       error: [...pick(petConf.on_floor ?? "onfloor"), ...defAct],       // 跌倒在地 = 出错
-      patpat: (petConf.patpat && (petConf.patpat["3"] ?? petConf.patpat["2"])) || "patpat1",
+      patpat,
       drag: petConf.drag ?? "drag",
       fall: petConf.fall ?? "fall",
     },
@@ -100,13 +162,23 @@ function fallbackPack() {
 }
 
 // ---------- 窗口 ----------
+// 渲染模型对齐 ToDoList:窗口 = 精灵画布(宽=精灵宽,高=精灵高+顶部气泡区),
+// 精灵 width:100% 铺满 → CSS 单次缩放,与浏览器一致的无锯齿。
+function petWindowSize(pack, zoom = 1) {
+  const dw = pack.display.width * pack.display.scale * zoom;
+  const dh = pack.display.height * pack.display.scale * zoom;
+  // 宽度下限 280:保证审批气泡(264px)在任何小尺寸包里都放得下
+  return { width: Math.max(280, Math.ceil(dw)), height: Math.ceil(dh) + 110 };
+}
+
 function createPetWindow(pack) {
   const area = screen.getPrimaryDisplay().workArea;
+  const size = petWindowSize(pack, loadSettings().zoom ?? 1);
   petWin = new BrowserWindow({
-    width: 320,
-    height: 440,
-    x: area.x + area.width - 340,
-    y: area.y + area.height - 460,
+    width: size.width,
+    height: size.height,
+    x: area.x + area.width - size.width - 24,
+    y: area.y + area.height - size.height - 8,
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
@@ -114,19 +186,40 @@ function createPetWindow(pack) {
     skipTaskbar: true,
     hasShadow: false,
     resizable: false,
-    webPreferences: { contextIsolation: true, preload: path.join(__dirname, "..", "pet", "preload.js") },
+    focusable: false, // 点击宠物不抢焦点(ToDoList 同款)
+    movable: false,   // 移动全部由代码控制(drag/walk)
+    webPreferences: {
+      contextIsolation: true,
+      preload: path.join(__dirname, "..", "pet", "preload.js"),
+      // 宠物窗只加载本地帧图;关闭 webSecurity 使 canvas 可读像素(气泡跟随头顶需要测透明边距)
+      webSecurity: false,
+    },
   });
+  petWin.setAlwaysOnTop(true, "screen-saver");
   petWin.loadFile(path.join(__dirname, "..", "pet", "index.html"));
+  petWin.webContents.on("console-message", (_e, level, message, line, sourceId) => {
+    if (level >= 3) console.error(`[pet ${path.basename(sourceId)}:${line}]`, message);
+  });
   petWin.webContents.on("did-finish-load", () =>
     petWin.webContents.send("pet:config", { ...pack, zoom: loadSettings().zoom ?? 1 }));
+
+  // 行走 = 移动窗口(ToDoList 方案):DWM 整窗位移,无重采样;撞屏幕边缘返回 false
+  ipcMain.handle("pet:walk", (_e, { direction, px }) => {
+    if (!petWin || petWin.isDestroyed()) return false;
+    const [wx, wy] = petWin.getPosition();
+    const [ww] = petWin.getSize();
+    const workArea = screen.getPrimaryDisplay().workArea;
+    // setPosition 只收整数,而步长可能是小数(frame_move × scale)
+    const x = Math.round(clamp(wx + (direction === -1 ? -px : px), workArea.x, workArea.x + workArea.width - ww));
+    if (x === wx) return false;
+    petWin.setPosition(x, Math.round(wy));
+    return true;
+  });
 
   // 滚轮缩放:窗口随有效倍率自适应,底边与水平中心保持不动,设置持久化
   ipcMain.on("pet:set-zoom", (_e, zoom) => {
     saveSettings({ zoom });
-    const dw = pack.display.width * pack.display.scale * zoom;
-    const dh = pack.display.height * pack.display.scale * zoom;
-    const width = Math.max(300, Math.ceil(dw) + 24);
-    const height = Math.ceil(dh) + 130; // 顶部气泡区 + 底部余量
+    const { width, height } = petWindowSize(pack, zoom);
     const [wx, wy] = petWin.getPosition();
     const [ww, wh] = petWin.getSize();
     const area = screen.getPrimaryDisplay().workArea;
@@ -162,15 +255,35 @@ function createPetWindow(pack) {
 }
 
 function createPanelWindow() {
+  const area = screen.getPrimaryDisplay().workArea;
   panelWin = new BrowserWindow({
-    width: 1080,
-    height: 700,
+    width: Math.round(area.width * 0.85),   // 初始尺寸:工作区 85% × 85%(用户指定)
+    height: Math.round(area.height * 0.85),
+    x: area.x + Math.round((area.width * 0.15) / 2),
+    y: area.y + Math.round((area.height * 0.15) / 2),
+    minWidth: 720,
+    minHeight: 480,
     frame: false,
-    backgroundColor: "#171a21", // 实底控制台(笔记 7.7 修订)
+    backgroundColor: "#ffffff", // 面板亮色(AionUi 复刻)
     show: !SMOKE,
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "..", "panel", "preload.js") },
   });
   panelWin.loadFile(path.join(__dirname, "..", "panel", "index.html"));
+  console.log("[trace] panel created, visible =", panelWin.isVisible());
+  panelWin.on("show", () => console.log("[trace] panel show"));
+  panelWin.on("close", () => console.log("[trace] panel close"));
+  panelWin.on("minimize", () => console.log("[trace] panel minimize"));
+  if (!SMOKE) {
+    panelWin.once("ready-to-show", () => {
+      console.log("[trace] ready-to-show, minimized =", panelWin.isMinimized());
+      if (panelWin.isMinimized()) panelWin.restore();
+      panelWin.show();
+      panelWin.focus();
+    });
+  }
+  panelWin.webContents.on("console-message", (_e, level, message, line, sourceId) => {
+    if (level >= 3) console.error(`[panel ${path.basename(sourceId)}:${line}]`, message);
+  });
   ipcMain.on("panel:window", (_e, action) => {
     if (action === "min") panelWin.minimize();
     if (action === "close") panelWin.hide(); // "收回",不退出
@@ -184,18 +297,27 @@ function firstThread() {
 }
 
 function bindThreadIpc() {
-  ipcMain.handle("turn:start", (_e, { text }) => {
-    let threadId = firstThread();
-    if (!threadId) threadId = manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "窝 · 新对话" }).threadId;
-    manager.startTurn(threadId, text);
+  ipcMain.handle("thread:create", () =>
+    manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "新对话" }).threadId);
+  ipcMain.handle("turn:start", (_e, { threadId, text }) => {
+    let id = typeof threadId === "string" && manager.snapshot().threads.some((t) => t.threadId === threadId)
+      ? threadId
+      : firstThread();
+    if (!id) id = manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "新对话" }).threadId;
+    try {
+      manager.startTurn(id, text);
+      return { ok: true };
+    } catch (error) {
+      // 会话运行中重复发送等业务拒绝:不抛未处理异常,回给面板做提示
+      return { ok: false, error: String(error?.message ?? error) };
+    }
   });
   ipcMain.handle("turn:stop", () => {
     const threadId = firstThread();
     if (threadId) manager.stopTurn(threadId);
   });
   ipcMain.handle("interaction:respond", (_e, { threadId, interactionId, behavior }) =>
-    manager.respond(threadId, interactionId, behavior));
-}
+    manager.respond(threadId, interactionId, behavior));}
 
 // ---------- 冒烟 ----------
 function finishSmoke(reason) {
@@ -210,12 +332,27 @@ app.whenReady().then(async () => {
   fs.mkdirSync(NEST_DIR, { recursive: true });
   let pack;
   try {
-    pack = loadPack(PACK_DIR);
-    console.log(`[v1] 宠物包:${PACK_DIR}(${Object.keys(pack.acts).length} 个动作)`);
+    pack = loadPack(PACK_DIR, loadSettings());
+    console.log(`[v1] 宠物包:${PACK_DIR}(${Object.keys(pack.acts).length} 个动作,渲染模式 ${pack.imageRendering})`);
   } catch (error) {
     console.error("[v1] 宠物包加载失败,回退 spike 果冻:", error.message);
     pack = fallbackPack();
   }
+
+  // 事件总线:契约事件 → 面板 + 宠物窗(smoke 模式附带收集)
+  let smokeTimer = null;
+  broadcast = (channel, payload) => {
+    if (SMOKE && channel === "contract:event" && payload) {
+      smokeEvents.push(payload);
+      if (payload.type === "turn.completed" || payload.type === "turn.failed") {
+        clearTimeout(smokeTimer);
+        smokeTimer = setTimeout(() => finishSmoke("turn-ended"), 800);
+      }
+    }
+    for (const win of [panelWin, petWin]) {
+      if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+    }
+  };
 
   manager = new ThreadManager({ broadcast: (ch, payload) => broadcast(ch, payload) });
   createPetWindow(pack);
@@ -223,26 +360,21 @@ app.whenReady().then(async () => {
   bindThreadIpc();
 
   if (SMOKE) {
-    const timer = setTimeout(() => finishSmoke("timeout-45s"), 45_000);
-    broadcast = (channel, payload) => {
-      if (channel === "contract:event" && payload) {
-        smokeEvents.push(payload);
-        if (payload.type === "turn.completed" || payload.type === "turn.failed") {
-          clearTimeout(timer);
-          setTimeout(() => finishSmoke("turn-ended"), 800);
-        }
-      }
-      for (const win of [panelWin, petWin]) {
-        if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
-      }
-    };
+    smokeTimer = setTimeout(() => finishSmoke("timeout-45s"), 45_000);
     setTimeout(() => {
       const thread = manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "smoke" });
       manager.startTurn(thread.threadId, "请只回复两个字母:pong");
     }, 1000);
   } else {
-    manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "窝 · 新对话" });
-    console.log("[v1] 手动模式:右下角宠物 + 控制台面板已就绪。模型:", MODEL ?? "(SDK 默认)");
+    manager.createThread({ cwd: NEST_DIR, model: MODEL, title: "新对话" });
+    console.log("[v1] 手动模式:右下角宠物 + 控制台面板已就绪。模型:", MODEL ?? "(SDK 默认)",
+      MOCK ? "(演示模式:2 秒后自动开演一轮模拟 turn)" : "");
+    if (MOCK) {
+      setTimeout(() => {
+        const threadId = firstThread();
+        if (threadId) manager.startTurn(threadId, "演示:走一遍完整流程(含审批)");
+      }, 2000);
+    }
   }
 });
 

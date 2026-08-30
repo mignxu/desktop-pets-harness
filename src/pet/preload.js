@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("petAPI", {
   dragStart: () => ipcRenderer.send("pet:drag-start"),
   dragMove: (screenX, screenY) => ipcRenderer.send("pet:drag-move", { screenX, screenY }),
   dragEnd: () => ipcRenderer.send("pet:drag-end"),
+  walk: (direction, px) => ipcRenderer.invoke("pet:walk", { direction, px }),
   poke: () => ipcRenderer.send("pet:poke"),
   bubbleOpen: (threadId) => ipcRenderer.send("bubble:open", threadId),
   setZoom: (zoom) => ipcRenderer.send("pet:set-zoom", zoom),

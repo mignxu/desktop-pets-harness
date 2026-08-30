@@ -1,14 +1,15 @@
-// act_conf 兼容 Player(自研,格式对齐 DyberPet,笔记 7.11):
-//   状态 → 动作组序列;act = 帧序列 + frame_refresh + act_num + anchor + need_move
-//   状态机:idle=加权随机动作组 / working=focus 循环 / waitingInteraction=被吵醒 / error=onfloor
-//   交互:单击=patpat,拖拽=drag+主进程移窗+松手 fall;审批气泡见 index.html/.bubble
+// act_conf 兼容 Player(格式对齐 DyberPet,笔记 7.11)。
+// 渲染模型对齐 ToDoList(用户上作,验证过的顺滑方案):
+//   窗口 = 精灵画布,精灵 width:100% 铺满 → CSS 单次缩放,与浏览器一致的无锯齿;
+//   行走 = 主进程移动窗口(DWM 整窗位移,无内容重采样);
+//   anchor[x,y] 经 transform/marginBottom 叠加;状态机:idle 加权动作组 /
+//   working=focus / waiting=disturbed / error=onfloor;patpat、拖拽、审批气泡。
 'use strict';
 
 const sprite = document.getElementById("sprite");
 const bubbleLayer = document.getElementById("bubbles");
 const statusDot = document.getElementById("status-dot");
 const groundShadow = document.getElementById("ground-shadow");
-const stage = document.getElementById("stage");
 
 const STATE_COLORS = {
   idle: "#3fbf7f",
@@ -22,9 +23,8 @@ const imgCache = new Map(); // actName -> Image[]
 let runToken = 0;
 let currentState = "idle";
 let stateBeforeDrag = null;
-let baseX = 0, baseY = 0;   // 精灵默认落位(窗口内)
-let moveX = 0;              // need_move 行走位移累积
-let zoom = 1;               // 用户缩放(滚轮调节,主进程持久化)
+let lastAct = null;         // 当前动作(zoom 变化后重摆帧位)
+let zoom = 1;               // 用户缩放(滚轮,主进程持久化并改窗口尺寸)
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function ready(img) {
@@ -45,35 +45,31 @@ function ensureImages(actName) {
   return imgs;
 }
 
-function layout() {
+// 每帧定位:精灵锚定底部居中,anchor [x, y] 叠加(+y 向下 = marginBottom 负值)
+function placeFrame(act) {
+  lastAct = act;
+  const s = effScale();
+  sprite.style.transform = `translateX(calc(-50% + ${(act.anchor[0] ?? 0) * s}px))`;
+  sprite.style.marginBottom = `${-(act.anchor[1] ?? 0) * s}px`;
+  positionBubbles();
+}
+
+function relayout() {
+  if (!config) return;
   const dw = config.display.width * effScale();
   const dh = config.display.height * effScale();
-  // 缩小倍率用平滑插值(避免锯齿线条感),放大像素画才用 pixelated
-  sprite.style.imageRendering = effScale() >= 1 ? "pixelated" : "auto";
+  // 精灵定宽(JS),窗口可能比精灵宽(小尺寸包给气泡留位);仍是 CSS 单次缩放
   sprite.style.width = `${dw}px`;
-  sprite.style.height = `${dh}px`;
-  baseX = (window.innerWidth - dw) / 2;
-  baseY = window.innerHeight - dh - 8; // 地面贴底
-  sprite.style.left = `${baseX + moveX}px`;
-  sprite.style.top = `${baseY}px`;
-  // 地面光晕:把宠物"钉"在地上,给比例一个参考物(对齐浏览器 demo 的观感)
+  sprite.style.imageRendering = config.imageRendering ?? "auto";
   const sw = Math.max(60, dw * 0.42);
   const sh = Math.max(10, dh * 0.05);
   groundShadow.style.width = `${sw}px`;
   groundShadow.style.height = `${sh}px`;
   groundShadow.style.left = `${window.innerWidth / 2 - sw / 2}px`;
-  groundShadow.style.top = `${baseY + dh - sh / 2}px`;
+  groundShadow.style.bottom = `${Math.round(dh * 0.02)}px`;
+  if (lastAct) placeFrame(lastAct);
+  positionBubbles();
 }
-
-// ---- 滚轮缩放(0.4x ~ 2.5x,主进程持久化并随缩放调整窗口)----
-window.addEventListener("wheel", (e) => {
-  if (!config) return;
-  const next = clamp(Math.round((zoom + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10, 0.4, 2.5);
-  if (next === zoom) return;
-  zoom = next;
-  layout();
-  window.petAPI.setZoom(zoom);
-}, { passive: true });
 
 // ---- 帧步进 ----
 async function playAct(actName, token, { loopUntilTokenChanges = false } = {}) {
@@ -88,12 +84,11 @@ async function playAct(actName, token, { loopUntilTokenChanges = false } = {}) {
       await ready(imgs[i]);
       if (token !== runToken) return;
       sprite.src = imgs[i].src;
-      if (act.needMove) moveX += (act.direction === "left" ? -1 : 1) * act.frameMove;
-      moveX = clamp(moveX, -46, 46);
-      const x = baseX + act.anchor[0] * effScale() + moveX;
-      const y = baseY + act.anchor[1] * effScale();
-      sprite.style.left = `${x}px`;
-      sprite.style.top = `${y}px`;
+      if (act.needMove && act.frameMove) {
+        // 行走 = 移动窗口;撞屏幕边缘返回 false → 原地踏步
+        window.petAPI.walk(act.direction === "left" ? -1 : 1, act.frameMove * effScale());
+      }
+      placeFrame(act);
       await wait(act.frameRefresh);
     }
   }
@@ -183,9 +178,42 @@ window.addEventListener("mouseup", () => {
 });
 
 // ---- 审批迷你气泡 ----
+// 气泡跟随角色头顶:量当前帧的透明上边距(ToDoList frameTops 方案),
+// 把气泡 bottom 锚到"可见的头顶"而不是帧图顶(帧图常有大量透明留白)。
+const headTops = new Map(); // frame src -> 头顶透明边距(自然像素)
+function topAlphaOf(src) {
+  let value = headTops.get(src);
+  if (value !== undefined) return value;
+  value = 0;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = sprite.naturalWidth;
+    canvas.height = sprite.naturalHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(sprite, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    outer: for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        if (data[(y * canvas.width + x) * 4 + 3] > 16) { value = y; break outer; }
+      }
+    }
+  } catch {
+    value = 0; // 像素不可读(安全策略)时退化为帧顶
+  }
+  headTops.set(src, value);
+  return value;
+}
+
+function positionBubbles() {
+  if (!bubbleLayer.firstElementChild || !sprite.naturalWidth) return;
+  const rect = sprite.getBoundingClientRect();
+  const headTop = rect.top + topAlphaOf(sprite.src) * (rect.height / sprite.naturalHeight);
+  bubbleLayer.style.top = "auto";
+  bubbleLayer.style.bottom = `${Math.max(4, Math.round(window.innerHeight - headTop + 8))}px`;
+}
+
 function renderBubbles(pending) {
   bubbleLayer.innerHTML = "";
-  bubbleLayer.style.top = "6px";
   bubbleLayer.style.pointerEvents = pending.length ? "auto" : "none";
   for (const item of pending) {
     const card = document.createElement("div");
@@ -197,27 +225,37 @@ function renderBubbles(pending) {
     card.querySelector("button").addEventListener("click", () => window.petAPI.bubbleOpen(item.threadId));
     bubbleLayer.appendChild(card);
   }
+  positionBubbles();
 }
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// ---- 点击穿透:只有精灵/气泡可点,其余透传(笔记 Spike D)----
+// ---- 点击穿透:只有精灵/气泡可点,其余透传 ----
 window.addEventListener("mousemove", (e) => {
   const el = document.elementFromPoint(e.clientX, e.clientY);
   const overUi = !!(el && (el.closest?.("#sprite") || el.closest?.(".bubble")));
   window.petAPI.reportHit(overUi);
 });
 
+// ---- 滚轮缩放:只报主进程,窗口 resize 后 resize 事件触发 relayout ----
+window.addEventListener("wheel", (e) => {
+  if (!config) return;
+  const next = clamp(Math.round((zoom + (e.deltaY < 0 ? 0.1 : -0.1)) * 10) / 10, 0.4, 2.5);
+  if (next === zoom) return;
+  zoom = next;
+  window.petAPI.setZoom(zoom);
+}, { passive: true });
+
 // ---- 主进程事件 ----
 window.petAPI.onConfig((cfg) => {
   config = cfg;
   zoom = clamp(cfg.zoom ?? 1, 0.4, 2.5);
-  layout();
+  relayout();
   setState("idle", true);
 });
 window.petAPI.onState(({ state, pending }) => {
   setState(state);
   renderBubbles(state === "waitingInteraction" ? pending : []);
 });
-window.addEventListener("resize", () => config && layout());
+window.addEventListener("resize", relayout);

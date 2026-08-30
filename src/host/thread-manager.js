@@ -3,7 +3,11 @@
 'use strict';
 
 const { ClaudeCodeSession } = require("../adapter/claude-code.js");
+const { MockSession } = require("../adapter/mock.js");
 const { aggregateStates } = require("../shared/contracts.js");
+
+// MOCK_TURN=1 时用模拟 adapter(演示/联调 UI 与审批闭环,无需真实凭据)
+const SessionImpl = process.env.MOCK_TURN === "1" ? MockSession : ClaudeCodeSession;
 
 class ThreadManager {
   constructor({ broadcast }) {
@@ -40,7 +44,7 @@ class ThreadManager {
     const thread = this.get(threadId);
     if (thread.session?.running) throw new Error("thread busy");
     if (thread.state === "error" || !thread.session) {
-      thread.session = new ClaudeCodeSession({
+      thread.session = new SessionImpl({
         threadId,
         cwd: thread.cwd,
         model: thread.model,
@@ -97,14 +101,14 @@ class ThreadManager {
     const threads = [...this.threads.values()];
     const petState = aggregateStates(threads.map((t) => t.state));
     const pending = threads
-      .flatMap((t) => collectPendingInteractions(t))
-      .map(({ threadId, title, interaction }) => ({
-        threadId,
-        title,
-        interactionId: interaction.interactionId,
-        toolName: interaction.toolName,
-        summary: interaction.summary,
-      }));
+      .flatMap((t) =>
+        collectPendingInteractions(t).map(({ interaction }) => ({
+          threadId: t.threadId,
+          title: t.title,
+          interactionId: interaction.interactionId,
+          toolName: interaction.toolName,
+          summary: interaction.summary,
+        })));
     this.broadcast("contract:event", latestEvent ?? null);
     this.broadcast("panel:snapshot-dirty");
     this.broadcast("pet:state", { state: petState, pending });

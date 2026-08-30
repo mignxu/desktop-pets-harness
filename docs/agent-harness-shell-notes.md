@@ -231,18 +231,25 @@ adapter 写得好不好,看翻译丢不丢味道——这就是"保真"的工程
 
 - **宠物永不审批**;迷你气泡上不放"拒绝"按钮(看不到内容不能拒绝),allow/deny 都只在面板
 - 无头工作区权限默认更严
+- **实机调试修出的三个坑(2026-08-29)**:
+  1. `publish` 组装气泡数据时解构错误(`{thread, interaction}` 里解 `threadId`)→ 气泡【我去处理】传 undefined → 面板跳空白首页。已修
+  2. adapter"先广播 interaction.opened、后注册 approvals"→ publish 算 pending 时为空 → 宠物永远收不到气泡(ClaudeCodeSession 同犯,一起修)。**时序铁律:先注册审批,再广播**
+  3. 气泡定位:帧图常有大量透明留白,按帧顶定位会"离头太远"——采用 ToDoList frameTops 方案:渲染层扫描当前帧 alpha 通道量出头顶边距(按 src 缓存),气泡 bottom 锚到可见头顶;宠物窗需 `webSecurity:false` 才能读 canvas 像素(只加载本地内容,可接受)。等待审批期间**循环播放"被吵醒"动画**直至处理完(用户要求)
+  4. **IPC snapshot 是结构化克隆的"当时副本",不是活引用**——面板 init 拿到的 log 数组不会随主进程事件增长,事件只靠推送做增量渲染;因此**任何全量重画(召唤聚焦/切换对话)前必须重新拉快照**,否则渲染出陈旧数据(表现为"召唤后跳到空白对话")。气泡样式已按用户要求复刻 ToDoList 原版(白底胶囊 + `#e8907e` 珊瑚描边 + 小尾巴)
 
 ### 7.6 去养成(明确决策)
 
 不做商店/任务/等级。宠物保留"活物感"(对用户存在的小反应,patpat 类)——陪伴感来自无功能细节。
 
-### 7.7 视觉方向(2026-08-29 修订:弃毛玻璃,改实底控制台)
+### 7.7 视觉方向(2026-08-29 第三次修订:面板直接复刻 AionUi)
 
-- **面板 = 实底控制台,视觉模仿 Codex Desktop**:中性深色表面、圆角卡片、细边框、清晰的字号层级;transcript/diff 可读性最优
-- 毛玻璃降级为可选增强:Win11 可给标题栏加 mica/acrylic(spike A 的材质解析代码保留),macOS vibrancy 同理——**任何平台上实底都是默认**,增强永不承载信息
-- 弃用"全息投影"叙事;科技感落点保留在**宠物状态光**(绿/琥珀/红)与面板细节(等宽数字、微弱高亮边)
-- 宠物层不变:透明窗 + 精灵帧动画
-- 教训记录:Win10 上"透明+半实底"的降级形态被用户判为丑——**主视觉不能建立在降级路径上**;实底控制台在所有平台一致,这也顺便消解了 7.7 原先的性能担忧(模糊合成成本归零)
+- **面板视觉 = 复刻 [AionUi](https://github.com/iOfficeAI/AionUi)(用户指定"开抄")**,token 取自其源码 `styles/themes/default-color-scheme.css`(Arco 体系亮色):主色 `#165dff`、成功 `#00b42a`、警告 `#ff7d00`、危险 `#f53f3f`、用户消息底 `#e9efff`、Agent 选择条 `#eaecf7`、品牌紫发送钮 `#7583b2`、文字 `#000/#454d5f/#86909c`、边框 `#e5e6eb/#f2f3f5`
+- **首页构图(空态)**:居中大字问候 → Agent 选择条(圆角胶囊条+白色 harness 胶囊+"+")→ 大圆角白 Composer 卡(model/权限胶囊 + 圆形发送钮)→ 下方 "📁 窝 ⌄"(对应它的 "Work in a project");`body.has-messages` 类切换 首页构图 ↔ 会话构图(composer 停靠底部)
+- 侧栏:白底,黑圆角方块 Logo + 粗体名,黑圆片 "+" 导航,分组纯文字列表,底部 Usage 小字
+- **侧栏 = AionUi Sider 完整结构**(源码级:SiderToolbar/SiderNav/GroupedHistory/SiderFooter):工具栏行(22px `rd-6px` + 芯片"新对话" + 批量管理图标)→ 助手/定时任务导航行(逻辑后加)→ 1px 分隔 → 滚动区(分组标签 28px/14px/三级灰 → **工作区组(📁 窝,可嵌套对话行)** → 对话组)→ Footer(Usage 小字 + 主题/设置)。对话行:22px 黑圆 harness 头像 + 14px/500 名称 + 生成中蓝点 `#2c7fff`(光晕)/琥珀待审批角标
+- **多对话已接线**:`thread:create` → 新空会话切首页构图;发送按 activeThreadId 路由;harness 图标挂对话行(铁律可视化)
+- 演进记录:暗色 Codex 式(半天,被否)→ ChatGPT Desktop 亮色(一天,被否「依旧很丑」)→ AionUi 首页皮(被否:「除了聊天哪里复刻了」)→ **AionUi 完整 UX(现行)**。教训固化:**用户点名参考物后,完整复刻其结构与 UX(含侧栏信息架构),不要只抄视觉皮;我们的精力放在加逻辑,不在 UI 发明**
+- 宠物层不变(渲染模型见 7.13);宠物状态光保留
 
 ### 7.8 面板线框(已定)
 
@@ -322,12 +329,16 @@ Renderer-面板窗(玻璃): 三栏 UI + transcript + 审批卡
 - 必需动作:`default`/`drag`/`fall`;可选:`prefall`/`onfloor`/`focus`(专注时仅播它)/`hide`(屏幕边缘悬挂)
 - 壳的对接结论:**Player 只吃 act_conf,Brain 吃 pet_conf 的动作组与映射**——两层契约天然分离,与第 6 节"契约先行"同构
 
-### 7.12 待定问题
+### 7.12 待定问题(2026-08-30 刷新)
 
-- [ ] Win11 真机补验 acrylic;换可用凭据(或直连 API)复测拿到 pong
-- [ ] 第一批 harness 之外的第二家(ACP 通用兜底 vs 原生)——Claude Code 已是第一批
-- [ ] 面板/审批闭环的肉眼验证(冒烟只验证了事件链,交互手感要人测)
-- [ ] MVP 收尾范围:多对话、会话持久化、Usage-饥饿联动等按需排期
+- [ ] **修凭据跑真 turn(最高优先)**:换可用中转 key / `CLAUDE_MODEL=<网关可用模型>` / 直连 API → 验证真实 Claude adapter + 真实审批闭环(模拟已全链路通过,真适配器同契约)
+- [ ] Win11 真机补验 acrylic(降级链代码已就位)
+- [ ] 第二家 harness(ACP 通用兜底 vs 原生)
+- [ ] 侧栏/Agent 条 emoji 图标 → 正式线性图标集
+- [ ] 多工作区(宠物=工作区,数据模型已预留;现仅"窝"一个)
+- [ ] 会话持久化、Usage-饥饿联动、MVP 收尾范围
+- [x] ~~面板/审批闭环的肉眼验证~~(2026-08-30 模拟模式实测:流式/工具卡/审批卡/气泡召唤/宠物状态全通过)
+- [x] ~~v1 垂直切片~~(见 7.13)
 
 ### 7.13 v1 垂直切片实现(2026-08-29,冒烟通过 ✅)
 
@@ -346,7 +357,12 @@ src/main/v1-main.js        装配:窝目录(nest/)、PET_PACK/CLAUDE_MODEL 环�
 ```
 
 - **冒烟结果**:事件链全通 `user → turn.started → thread.meta → item.started → item.updated(textDelta 流式!) → item.completed → turn.completed`;宠物包 23 动作加载成功
+- **渲染模型对齐 ToDoList(用户上作,教训换来的)**:窗口=精灵画布(精灵 width:100% 铺满,CSS 单次缩放 → 浏览器同款平滑无锯齿;**严禁 image-rendering: pixelated 用于缩小场景**——曾致"线条感"返工);行走=主进程移动窗口(DWM 整窗位移,撞屏幕边原地踏步);`focusable:false` 点宠不抢焦点。地面光晕给比例参考;滚轮缩放 0.4-2.5x(底边/水平中心锚定,持久化 pet-settings.json)
 - 本机中转网关 403("无权访问 国产模型 分组",会话被解析到 DeepSeek-V4-Flash)是**凭据/网关配置问题**,不影响架构;换凭据即可看到真 pong
+- **演示模式(2026-08-29)**:`npm run start:mock`(`--mock` → MOCK_TURN=1 → ThreadManager 选用 `src/adapter/mock.js` 的 MockSession),按时序演出完整契约事件流(思考→流式回复→命令卡→文件卡→**真实审批暂停**→收尾),含假 Usage。已端到端走通:面板消息流/工具卡/审批卡"已允许"/Usage 渲染 + 宠物状态闭环
+- **两个被演示模式揪出的老 bug**:
+  1. **broadcast 空函数吞事件**:模块级 `broadcast` 默认 no-op,只有 smoke 分支重新赋值 → 手动模式下面板/宠物从未收到过任何事件(此前未被发现,因为验收截图全是空首页)。已修复:总线实现统一,smoke 只附加收集钩子
+  2. MockSession 构造器漏初始化 `approvals` Map → 首个事件即崩、又被 `start().catch(()=>{})` 静默吞掉 → 面板空白且日志干净。教训:**适配器的会话状态字段必须在构造器初始化;start 的 catch 不要静默,至少 diagnose**
 - v0 spike UI 迁至 `src/spike/`(保留可运行),v1 入口为默认;入口分发在 `src/main/main.js`
 
 ---

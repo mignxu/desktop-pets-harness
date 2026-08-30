@@ -3,16 +3,16 @@
   "events": [
     {
       "__user": true,
-      "threadId": "t_mte7e6wx_v0yfo",
+      "threadId": "t_mtf6a3dp_zfgdu",
       "text": "请只回复两个字母:pong"
     },
     {
       "type": "turn.started",
-      "threadId": "t_mte7e6wx_v0yfo"
+      "threadId": "t_mtf6a3dp_zfgdu"
     },
     {
       "type": "thread.meta",
-      "threadId": "t_mte7e6wx_v0yfo",
+      "threadId": "t_mtf6a3dp_zfgdu",
       "meta": {
         "model": "DeepSeek-V4-Flash",
         "cwd": "D:\\selfProject\\Dev\\desktop-pets-harness\\nest"
@@ -20,38 +20,38 @@
     },
     {
       "type": "item.started",
-      "threadId": "t_mte7e6wx_v0yfo",
+      "threadId": "t_mtf6a3dp_zfgdu",
       "item": {
-        "itemId": "799a0cd0-687f-4266-b00d-f0130ffb077f",
+        "itemId": "6b879b92-0080-4456-8aa9-a730fb9af6e5",
         "type": "agentMessage",
         "text": ""
       }
     },
     {
       "type": "item.updated",
-      "threadId": "t_mte7e6wx_v0yfo",
-      "itemId": "799a0cd0-687f-4266-b00d-f0130ffb077f",
+      "threadId": "t_mtf6a3dp_zfgdu",
+      "itemId": "6b879b92-0080-4456-8aa9-a730fb9af6e5",
       "patch": {
-        "textDelta": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608290954112096194918268d9d60YRDp9wN)"
+        "textDelta": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608300210448175878698268d9d6XCa4PZI6)"
       }
     },
     {
       "type": "item.completed",
-      "threadId": "t_mte7e6wx_v0yfo",
-      "itemId": "799a0cd0-687f-4266-b00d-f0130ffb077f",
+      "threadId": "t_mtf6a3dp_zfgdu",
+      "itemId": "6b879b92-0080-4456-8aa9-a730fb9af6e5",
       "status": "succeeded"
     },
     {
       "type": "turn.completed",
-      "threadId": "t_mte7e6wx_v0yfo",
+      "threadId": "t_mtf6a3dp_zfgdu",
       "outcome": {
         "status": "failed",
-        "result": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608290954112096194918268d9d60YRDp9wN)",
+        "result": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608300210448175878698268d9d6XCa4PZI6)",
         "usage": {
           "inputTokens": 0,
           "outputTokens": 0,
           "costUsd": 0,
-          "error": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608290954112096194918268d9d60YRDp9wN)"
+          "error": "Failed to authenticate. API Error: 403 无权访问 国产模型 分组 (request id: 202608300210448175878698268d9d6XCa4PZI6)"
         }
       }
     }

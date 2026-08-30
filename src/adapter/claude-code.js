@@ -60,6 +60,10 @@ class ClaudeCodeSession {
   // ---- 审批:SDK canUseTool 回调 → 契约 interaction → 等面板决定 ----
   async requestApproval(toolName, input) {
     const interactionId = randomUUID();
+    // 先注册审批、再广播:否则 publish 计算 pending 时 Map 为空,宠物收不到气泡
+    let resolveApproval;
+    const decisionPromise = new Promise((resolve) => { resolveApproval = resolve; });
+    this.approvals.set(interactionId, resolveApproval);
     this.emit({
       type: "interaction.opened",
       threadId: this.threadId,
@@ -71,7 +75,7 @@ class ClaudeCodeSession {
         detail: input,
       },
     });
-    const decision = await new Promise((resolve) => this.approvals.set(interactionId, resolve));
+    const decision = await decisionPromise;
     this.emit({
       type: "interaction.closed",
       threadId: this.threadId,

@@ -2,7 +2,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("panelAPI", {
   snapshot: () => ipcRenderer.invoke("panel:snapshot"),
-  startTurn: (text) => ipcRenderer.invoke("turn:start", { text }),
+  createThread: () => ipcRenderer.invoke("thread:create"),
+  startTurn: (threadId, text) => ipcRenderer.invoke("turn:start", { threadId, text }),
   stopTurn: () => ipcRenderer.invoke("turn:stop"),
   respond: (threadId, interactionId, behavior) =>
     ipcRenderer.invoke("interaction:respond", { threadId, interactionId, behavior }),
