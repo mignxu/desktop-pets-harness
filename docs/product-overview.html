@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DesktopPetShell · 产品图与定位</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --ink: #1a1a1a;
+    --muted: #5b6470;
+    --line: #e3e6ea;
+    --blue: #185fa5;
+    --purple: #534ab7;
+    --green: #0f6e56;
+    --amber: #854f0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  h2 { font-size: 18px; margin: 0 0 6px; }
+  h2 .tag { font-size: 12px; font-weight: 400; color: #fff; background: var(--blue); padding: 2px 8px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+  p.lead { color: var(--muted); margin: 6px 0 14px; }
+  svg { width: 100%; height: auto; display: block; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f0f3f7; color: #333; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .k-a { color: var(--amber); font-weight: 600; }
+  .k-b { color: var(--green); font-weight: 600; }
+  .note { background: #fff8ec; border: 1px solid #f3d9a8; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #6b4a14; }
+  code { background: #eef1f5; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+  ul { margin: 8px 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>DesktopPetShell · 产品图与定位</h1>
+  <p class="sub">桌面宠物形态的多 harness agent 壳 — 架构分层、概念双轴、目标人群与 GTM 策略（2026-09-03 整理）</p>
+
+  <!-- 图1 -->
+  <div class="card">
+    <h2>① 多 harness 统一壳：什么通用，什么各家自有<span class="tag">架构分层</span></h2>
+    <p class="lead">通用性分两层；MCP 是跨 harness 的最大公约数。SDK / 桌面端 / 私有扩展不通用，靠契约层对 UI 透明。</p>
+    <svg viewBox="0 0 680 540" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text x="340" y="28" text-anchor="middle" font-size="15" font-weight="500" fill="#0C447C">多 harness 统一壳：什么通用，什么各家自有</text>
+      <rect x="40" y="46" width="600" height="74" rx="12" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/>
+      <text x="56" y="70" font-size="14" font-weight="500" fill="#0C447C">① 统一壳 DesktopPetShell — 跨 harness 唯一（你做的）</text>
+      <text x="56" y="92" font-size="13" fill="#185FA5">宠物层(状态/陪伴/审批召唤) · 面板 React+Arco · 契约 eventSchemas · capabilities 能力表</text>
+      <text x="56" y="112" font-size="12" fill="#378ADD">UI 只认统一契约，不认具体 harness → 能力来自原生，壳不伪造</text>
+      <rect x="40" y="138" width="600" height="64" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.2"/>
+      <text x="56" y="160" font-size="14" font-weight="500" fill="#26215C">② 适配层 adapters — 翻译：各家原生 → 统一契约</text>
+      <rect x="56" y="170" width="156" height="24" rx="6" fill="#ffffff" stroke="#534AB7" stroke-width="0.8"/>
+      <text x="134" y="184" text-anchor="middle" font-size="12" fill="#3C3489">claude-code.js</text>
+      <rect x="224" y="170" width="120" height="24" rx="6" fill="#ffffff" stroke="#534AB7" stroke-width="0.8"/>
+      <text x="284" y="184" text-anchor="middle" font-size="12" fill="#3C3489">mock.js</text>
+      <rect x="356" y="170" width="156" height="24" rx="6" fill="#ffffff" stroke="#AFA9EC" stroke-width="0.8"/>
+      <text x="434" y="184" text-anchor="middle" font-size="12" fill="#534AB7">codex.js（待建）</text>
+      <rect x="40" y="222" width="600" height="92" rx="12" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1.2" stroke-dasharray="6 4"/>
+      <text x="56" y="246" font-size="14" font-weight="500" fill="#173404">③ MCP 服务器层 — 开放协议 · 跨 harness 通用 ✅</text>
+      <text x="56" y="268" font-size="13" fill="#27500A">server 一次编写，Claude / Codex / Cursor / Windsurf 都能接（只要支持 MCP）</text>
+      <text x="56" y="288" font-size="12" fill="#3B6D11">边界：client 接线格式各家不同（.mcp.json / settings / .cursor）→ 由壳统一注册·发现·开关</text>
+      <text x="56" y="306" font-size="12" fill="#3B6D11">高级特性 sampling / elicitation / roots 各客户端支持度不一 → 按 capabilities 降级</text>
+      <text x="40" y="338" font-size="13" font-weight="500" fill="#444441">④ 各 harness 原生 — 各家自有，不通用 ❌，靠壳抽象</text>
+      <rect x="40" y="348" width="186" height="150" rx="12" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+      <text x="133" y="370" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Claude Code</text>
+      <text x="54" y="392" font-size="12" fill="#444441">· 自有桌面端（被壳取代）</text>
+      <text x="54" y="412" font-size="12" fill="#444441">· 自有 Agent SDK</text>
+      <text x="54" y="432" font-size="12" fill="#444441">· 私有 hooks / subagents</text>
+      <text x="54" y="452" font-size="12" fill="#444441">· 配置 / 记忆格式私有</text>
+      <text x="54" y="472" font-size="12" fill="#444441">· 独立计费</text>
+      <text x="54" y="492" font-size="12" fill="#444441">· 接 MCP（client 接线）</text>
+      <rect x="247" y="348" width="186" height="150" rx="12" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="1"/>
+      <text x="340" y="370" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A">Codex / Pi</text>
+      <text x="261" y="392" font-size="12" fill="#444441">· 自有桌面端 / Web</text>
+      <text x="261" y="412" font-size="12" fill="#444441">· 自有 SDK / CLI</text>
+      <text x="261" y="432" font-size="12" fill="#444441">· 私有配置 / 扩展</text>
+      <text x="261" y="452" font-size="12" fill="#444441">· 独立计费</text>
+      <text x="261" y="472" font-size="12" fill="#444441">· 接 MCP（client 接线）</text>
+      <text x="261" y="492" font-size="12" fill="#444441">· 能力声明待补</text>
+      <rect x="454" y="348" width="186" height="150" rx="12" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+      <text x="547" y="370" text-anchor="middle" font-size="13" font-weight="500" fill="#633806">壳统一接管</text>
+      <text x="468" y="392" font-size="12" fill="#854F0B">· 桌面端 → 宠物 + 面板</text>
+      <text x="468" y="412" font-size="12" fill="#854F0B">· SDK → adapter 翻译</text>
+      <text x="468" y="432" font-size="12" fill="#854F0B">· MCP → 壳统一纳管</text>
+      <text x="468" y="452" font-size="12" fill="#854F0B">· 成本 → 契约 usage</text>
+      <text x="468" y="472" font-size="12" fill="#854F0B">· 审批 / 陪伴 → 壳能力</text>
+      <text x="468" y="492" font-size="12" fill="#854F0B">· 能力不齐 → capabilities</text>
+      <line x1="30" y1="498" x2="30" y2="60" stroke="#888780" stroke-width="1" marker-end="url(#arrow)"/>
+      <text x="36" y="290" font-size="11" fill="#5F5E5A" transform="rotate(-90 36 290)">数据流向 ④ → ② → ①</text>
+    </svg>
+  </div>
+
+  <!-- 图2 -->
+  <div class="card">
+    <h2>② Harness 轴 × Model 轴：两个独立维度<span class="tag">概念澄清</span></h2>
+    <p class="lead">壳统一的是竖轴（Harness），不是横轴（Model）。换模型通常在单 harness 内即可，不靠壳。</p>
+    <svg viewBox="0 0 680 430" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+      <defs>
+        <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text x="340" y="26" text-anchor="middle" font-size="15" font-weight="500" fill="#0C447C">两个独立维度：Harness（壳统一） vs Model（换模型不靠壳）</text>
+      <line x1="120" y1="360" x2="120" y2="70" stroke="#5F5E5A" stroke-width="1"/>
+      <line x1="120" y1="360" x2="620" y2="360" stroke="#5F5E5A" stroke-width="1"/>
+      <text x="60" y="115" text-anchor="middle" font-size="12" fill="#0C447C" transform="rotate(-90 60 115)">Harness（壳统一的是它）</text>
+      <text x="370" y="392" text-anchor="middle" font-size="12" fill="#0C447C">Model（换模型走这条轴，不靠壳）</text>
+      <text x="112" y="115" text-anchor="end" font-size="13" fill="#2C2C2A">Claude Code</text>
+      <text x="112" y="215" text-anchor="end" font-size="13" fill="#2C2C2A">Codex</text>
+      <text x="112" y="315" text-anchor="end" font-size="13" fill="#2C2C2A">Pi</text>
+      <text x="230" y="380" text-anchor="middle" font-size="12" fill="#444441">DeepSeek</text>
+      <text x="350" y="380" text-anchor="middle" font-size="12" fill="#444441">GLM</text>
+      <text x="470" y="380" text-anchor="middle" font-size="12" fill="#444441">GPT</text>
+      <text x="580" y="380" text-anchor="middle" font-size="12" fill="#444441">Claude</text>
+      <circle cx="580" cy="110" r="7" fill="#185FA5"/>
+      <circle cx="230" cy="210" r="7" fill="#185FA5"/>
+      <circle cx="470" cy="210" r="7" fill="#185FA5"/>
+      <circle cx="350" cy="310" r="7" fill="#185FA5"/>
+      <line x1="245" y1="210" x2="455" y2="210" stroke="#0F6E56" stroke-width="2" marker-end="url(#arrow2)"/>
+      <text x="350" y="198" text-anchor="middle" font-size="12" fill="#0F6E56">换模型：同 harness 内搞定，不需壳</text>
+      <line x1="645" y1="120" x2="645" y2="310" stroke="#534AB7" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow2)"/>
+      <text x="660" y="215" text-anchor="middle" font-size="12" fill="#534AB7" transform="rotate(90 660 215)">换 Harness：壳统一，不换软件</text>
+      <text x="370" y="415" text-anchor="middle" font-size="12" fill="#5F5E5A">壳统一的是【竖轴 Harness】；【横轴 Model】由各 harness 自身配置 / 模型网关解决</text>
+    </svg>
+  </div>
+
+  <!-- 图3 -->
+  <div class="card">
+    <h2>③ 两层产品模型 × 两类人群<span class="tag">定位</span></h2>
+    <p class="lead">伴侣层（宠物+面板）对所有人通用；统一层（多 harness 切换）是增值层，只在用多家时触发。</p>
+    <svg viewBox="0 0 680 380" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, system-ui, sans-serif">
+      <defs>
+        <marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text x="340" y="26" text-anchor="middle" font-size="15" font-weight="500" fill="#0C447C">两层产品模型 × 两类人群</text>
+      <rect x="56" y="60" width="300" height="250" rx="14" fill="#ffffff" stroke="#5F5E5A" stroke-width="1"/>
+      <text x="206" y="84" text-anchor="middle" font-size="14" font-weight="500" fill="#2C2C2A">产品（两层）</text>
+      <rect x="80" y="100" width="252" height="78" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.2"/>
+      <text x="206" y="126" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C">伴侣层（宠物 + 面板）</text>
+      <text x="206" y="148" text-anchor="middle" font-size="11.5" fill="#185FA5">harness 无关 · 通用 · 所有人都有</text>
+      <rect x="80" y="196" width="252" height="78" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.2"/>
+      <text x="206" y="222" text-anchor="middle" font-size="13" font-weight="500" fill="#26215C">统一层（多 harness 切换）</text>
+      <text x="206" y="244" text-anchor="middle" font-size="11.5" fill="#534AB7">增值层 · 只在用多家时触发</text>
+
+      <rect x="420" y="70" width="210" height="96" rx="12" fill="#FAEEDA" stroke="#854F0B" stroke-width="1.2"/>
+      <text x="525" y="94" text-anchor="middle" font-size="13" font-weight="500" fill="#633806">A · 多 harness 统一派</text>
+      <text x="432" y="116" font-size="11.5" fill="#854F0B">消费：伴侣层 + 统一层</text>
+      <text x="432" y="136" font-size="11.5" fill="#854F0B">态度：强烈建议体验</text>
+      <rect x="420" y="196" width="210" height="96" rx="12" fill="#EAF3DE" stroke="#0F6E56" stroke-width="1.2"/>
+      <text x="525" y="220" text-anchor="middle" font-size="13" font-weight="500" fill="#173404">B · 单 harness 宠物派</text>
+      <text x="432" y="242" font-size="11.5" fill="#0F6E56">消费：伴侣层（仅）</text>
+      <text x="432" y="262" font-size="11.5" fill="#0F6E56">态度：来撸宠物就好</text>
+
+      <line x1="408" y1="110" x2="420" y2="110" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow3)"/>
+      <line x1="408" y1="150" x2="420" y2="150" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow3)"/>
+      <line x1="408" y1="244" x2="420" y2="244" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow3)"/>
+      <text x="340" y="358" text-anchor="middle" font-size="12.5" fill="#5F5E5A">首屏先讲 B（楔子）后讲 A；C3（Codex adapter）是两故事的 GTM 闸门</text>
+    </svg>
+  </div>
+
+  <!-- 定位表 -->
+  <div class="card">
+    <h2>目标人群与卖点矩阵</h2>
+    <table>
+      <thead>
+        <tr><th>人群</th><th>特征</th><th>痛点</th><th>我们的主张</th><th>交付层</th><th>态度</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="k-a">A 统一派</td>
+          <td>同时用 codex / claude / pi，天天切窗</td>
+          <td>切软件、丢上下文、审批散落</td>
+          <td>“一个壳，装下你所有的 agent”</td>
+          <td>伴侣层 + 统一层</td>
+          <td>强烈建议体验</td>
+        </tr>
+        <tr>
+          <td class="k-b">B 宠物派</td>
+          <td>只用 Codex（或任一），只换模型</td>
+          <td>无“切软件”痛，但想要更好体验</td>
+          <td>“你最爱的 Codex 不动，多一只会陪你、会喊你审批的宠物”</td>
+          <td>伴侣层（宠物 + 面板）</td>
+          <td>来撸宠物</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note" style="margin-top:14px">
+      <b>GTM 策略：</b>首屏先讲 <b>B</b>（宠物楔子，对所有人成立），再讲 <b>A</b>（统一层，对少数人多成立）。
+      统一层只对 A 共鸣且 A 是少数；若首屏只喊“统一所有 harness”，B 会直接走人。
+      两个卖点当前都依赖 <code>C3（Codex adapter）</code>：A 需 ≥2 个真 adapter 才能“切不换窗”，B 需宠物能骑在 Codex 上跑。
+    </div>
+  </div>
+
+  <!-- 边界说明 -->
+  <div class="card">
+    <h2>对外话术的硬边界（避免小白误解）</h2>
+    <ul>
+      <li><b>宠物不是“盖在外部 Codex Desktop 上的浮层”。</b>当前架构中壳是 host，harness 由壳启动，宠物吃的是契约事件流。所以 B 的真实含义是：<b>“用我们的壳启动 Codex（引擎/账号/计费不变），白赚一只宠物”</b>，不是同时开两个东西。</li>
+      <li><b>壳不伪造能力。</b>Codex 在壳里跑，底层仍是 Codex 引擎/模型/账号；答案质量不增不减，壳只是前端 Wrapper + 伴侣层。</li>
+      <li><b>换模型走横轴。</b>若 B 只想换 DeepSeek/GLM/GPT，靠 Codex 自身模型网关即可，本壳不解决、也不该解决模型切换。</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

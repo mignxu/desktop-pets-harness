@@ -321,7 +321,7 @@ function createPanelWindow() {
     show: !SMOKE,
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "..", "panel", "preload.js") },
   });
-  panelWin.loadFile(path.join(__dirname, "..", "..", "build", "panel", "index.html"));
+  panelWin.loadFile(path.join(__dirname, "..", "..", "panel-dist", "index.html"));
   if (!SMOKE) {
     panelWin.once("ready-to-show", () => {
       if (panelWin.isMinimized()) panelWin.restore();

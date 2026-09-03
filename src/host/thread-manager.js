@@ -5,6 +5,8 @@
 const { ClaudeCodeSession } = require("../adapter/claude-code.js");
 const { MockSession } = require("../adapter/mock.js");
 const { aggregateStates } = require("../shared/contracts.js");
+const { validateContractEvent } = require("../shared/eventSchemas.js");
+const { getCapabilities } = require("../shared/capabilities.js");
 
 // MOCK_TURN=1 时用模拟 adapter(演示/联调 UI 与审批闭环,无需真实凭据)
 const SessionImpl = process.env.MOCK_TURN === "1" ? MockSession : ClaudeCodeSession;
@@ -68,6 +70,11 @@ class ThreadManager {
   handleEvent(event) {
     const thread = this.threads.get(event.threadId);
     if (!thread) return;
+    // 契约校验:非致命,仅报错(不阻断事件流),用于捕获 adapter 翻译回归
+    const vr = validateContractEvent(event);
+    if (!vr.ok) {
+      console.error("[contract] 事件不符合契约:", vr.errors.join("; "), "→", JSON.stringify(event).slice(0, 300));
+    }
     thread.log.push(event);
 
     switch (event.type) {
@@ -126,7 +133,9 @@ class ThreadManager {
       pending: collectPendingInteractions(t).length,
     }));
     const log = Object.fromEntries([...this.threads.values()].map((t) => [t.threadId, t.log]));
-    return { threads, log };
+    // 能力表:面板据此做 UI 降级(审批/流式开关等)。harness 单一,取当前生效的那条。
+    const capabilities = getCapabilities("claude-code", { mock: process.env.MOCK_TURN === "1" });
+    return { threads, log, capabilities };
   }
 
   // ---- 会话持久化:落盘 / 恢复(事件日志可完整重放,面板 renderAll 直接吃) ----

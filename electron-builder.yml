@@ -3,14 +3,31 @@ productName: DesktopPetShell
 directories:
   output: dist
   buildResources: build
+# 基模式 **/* 必须保留:否则 electron-builder 的目录遍历剪枝会漏掉顶层 X/**/* 模式(如 panel-dist),导致面板打不进包
+# 自动排除 build/ dist/ node_modules(自动) 等;panel-dist 因不在保留名内会被 **/* 正常扫入
+# 下面用否定模式剔除不应进入安装包的本地产物/日志/运行时数据/记忆目录
 files:
-  - package.json
-  - src/**/*
-  - build/panel/**/*
+  - "**/*"
+  - "!dist_build*.log"
+  - "!**/*.log"
+  - "!winCodeSign-2.6.0.7z"
+  - "!spike-results.json"
+  - "!v1-smoke.json"
+  - "!pet-settings.json"
+  - "!releases.json"
+  - "!store/**"
+  - "!.workbuddy/**"
+  - "!demo/**"
+  - "!tools/**"
+  - "!build/**"
+  # 测试脚本不打进安装包(构建期用 gen-icon.js 仍需留 scripts/,故只排除测试文件)
+  - "!scripts/test-approval-loop.cjs"
 extraResources:
   - from: 小呆
     to: 小呆
 win:
+  # 本环境无代码签名证书,跳过 exe 改写/签名(图标与元数据仍由 electron-builder 通过 win.icon 正常写入)
+  signAndEditExecutable: false
   icon: build/icon.png
   target:
     - target: nsis

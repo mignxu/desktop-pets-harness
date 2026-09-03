@@ -364,7 +364,7 @@ src/main/v1-main.js        装配:窝目录(nest/)、PET_PACK/CLAUDE_MODEL 环�
   1. **broadcast 空函数吞事件**:模块级 `broadcast` 默认 no-op,只有 smoke 分支重新赋值 → 手动模式下面板/宠物从未收到过任何事件(此前未被发现,因为验收截图全是空首页)。已修复:总线实现统一,smoke 只附加收集钩子
   2. MockSession 构造器漏初始化 `approvals` Map → 首个事件即崩、又被 `start().catch(()=>{})` 静默吞掉 → 面板空白且日志干净。教训:**适配器的会话状态字段必须在构造器初始化;start 的 catch 不要静默,至少 diagnose**
 - **真 turn 准备包(2026-08-30)**:① agent 回复走 **markdown 渲染**(marked,先转义 `< >` 防注入再 parse;流式 150ms 节流重渲染,completed 时 flush)② fileChange 卡支持 **unified diff +/- 着色视图**(契约词 `item.unifiedDiff`,mock 已带样例;真实 Edit 的 diff 形状待真 turn 检验后补提取)③ **会话持久化**:事件日志全量落盘 `store/conversations.json`(每事件防抖 600ms,退出兜底),启动恢复(`loadThreads`,运行中会话归位 idle,日志完整重放);smoke 模式不恢复
-- **面板渲染层已迁移 React18 + Arco(2026-08-30)**:动机——手写增量 DOM 的 bug 类(双写/陈旧快照/手工映射)在声明式渲染下整体消失;AionUi 同栈便于复刻;Arco 组件白送流式状态(Skeleton/Spin/Collapse)。架构:主进程与 preload 接缝零改动,仅换 `src/panel-app`(Vite 构建到 `build/panel`,Electron loadFile);状态 = useReducer(快照折叠 + 增量事件不可变合并),渲染 = f(state)。**任何全量重画前重拉快照的教训依然适用(7.5 第 4 条)**。流式状态已内建:等首 token 骨架屏、思考中 Spin、流式光标、滚动吸附(用户上翻不被拽回)。smoke 模式不再写会话存储
+- **面板渲染层已迁移 React18 + Arco(2026-08-30)**:动机——手写增量 DOM 的 bug 类(双写/陈旧快照/手工映射)在声明式渲染下整体消失;AionUi 同栈便于复刻;Arco 组件白送流式状态(Skeleton/Spin/Collapse)。架构:主进程与 preload 接缝零改动,仅换 `src/panel-app`(Vite 构建到 `panel-dist`,Electron loadFile);状态 = useReducer(快照折叠 + 增量事件不可变合并),渲染 = f(state)。**任何全量重画前重拉快照的教训依然适用(7.5 第 4 条)**。流式状态已内建:等首 token 骨架屏、思考中 Spin、流式光标、滚动吸附(用户上翻不被拽回)。smoke 模式不再写会话存储
 - v0 spike UI 迁至 `src/spike/`(保留可运行),v1 入口为默认;入口分发在 `src/main/main.js`
 
 ### 7.14 真 turn 接入战记(2026-08-30)
@@ -379,10 +379,10 @@ src/main/v1-main.js        装配:窝目录(nest/)、PET_PACK/CLAUDE_MODEL 环�
 
 ### 7.15 打包战记(2026-08-30 晚,进行中)
 
-- **配置就绪**:`electron-builder.yml`(参考 ToDoList:appId/productName/files 含 `src`+`build/panel`/extraResources 挂 `小呆`/nsis+portable 双目标);图标 `scripts/gen-icon.js`(站帧 → `build/icon.png`,`npm run icon`);命令 `npm run dist`(安装包)/`dist:dir`(免装验证)
+- **配置就绪**:`electron-builder.yml`(参考 ToDoList:appId/productName/files 含 `src`+`panel-dist`/extraResources 挂 `小呆`/nsis+portable 双目标);图标 `scripts/gen-icon.js`(站帧 → `build/icon.png`,`npm run icon`);命令 `npm run dist`(安装包)/`dist:dir`(免装验证)
 - **打包态路径分流**:`v1-main` 已改——可写数据(store/nest/pet-settings)在打包后走 `userData`,宠物包走 `process.resourcesPath/小呆`;开发态不变(APP_ROOT)
 - **卡点**:① electron zip 下载慢 → 已过(100%);② winCodeSign 下载 600s 超时(got);③ 跳过 exe 改写(`-c.win.signAndEditExecutable=false`)后又在 unpack 阶段静默退出(127,无错误输出,疑似被会话清理误杀)。**下会话第一步:清锁重跑 ③;若再挂,DEBUG=electron-builder 抓 URL,npmmirror 手动预填 `%LOCALAPPDATA%\electron-builder\Cache`**
-- 面板渲染层迁移 React 后,**改面板必须 `npm run panel:build`**(Electron 加载 `build/panel`)——已写入 AGENTS.md 锁定决策
+- 面板渲染层迁移 React 后,**改面板必须 `npm run panel:build`**(Electron 加载 `panel-dist`)——已写入 AGENTS.md 锁定决策
 - **真 turn 跑通(2026-08-30)**:站主关闭请求穿透后,`minimax-m2.5` 经壳完整跑通真 turn(流式正文、usage/cost 全真)。收尾适配:MiniMax 系把思考以 `<think>…</think>` 混在正文流——adapter 按标签拆分进 reasoning 条目;SDK `assistant` 完整消息与流式增量是同一份内容,**流式已输出的块在 assistant 阶段只做收尾,不重复追加**(否则双写)
 
 ---
